@@ -18,6 +18,7 @@ WhatsMissing is a launcher that provides some extensions to the official Windows
 - Notification icon indicates whether new messages were received
 - WhatsApp can be configured to be always on top
 - Easy installation/uninstallation without modifications to WhatsApp's original files
+- Built using Lazarus :fire:
 
 ### Requirements
 - [WhatsApp Client](https://www.whatsapp.com/download) (64 and 32 Bit supported)
