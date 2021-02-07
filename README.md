@@ -2,11 +2,9 @@
 
 WhatsMissing is a launcher that provides some extensions to the official Windows WhatsApp Client.
 
-<img src="./.github/WhatsApp.png" alt="WhatsApp">
 <p align="center">
+  <img src="./.github/WhatsApp.png" alt="WhatsApp">
   <img src="./.github/Settings.png" alt="Settings">
-</p>
-<p align="right">
   <img src="./.github/Notification.png" alt="Notification icon">
 </p>
 
