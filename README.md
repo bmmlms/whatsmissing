@@ -4,7 +4,10 @@ WhatsMissing is a launcher that provides some extensions to the official Windows
 
 <p align="center">
   <img src="./.github/WhatsApp.png" alt="WhatsApp">
+</p>
+<p align="center">
   <img src="./.github/Settings.png" alt="Settings">
+</p>
   <img src="./.github/Notification.png" alt="Notification icon">
 </p>
 
