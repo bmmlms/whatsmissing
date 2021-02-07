@@ -1,0 +1,489 @@
+unit ASAR;
+
+interface
+
+uses
+  Classes,
+  fpjson,
+  Generics.Collections,
+  SysUtils;
+
+type
+  TASAR = class;
+  TASARDir = class;
+
+  TASAREntry = class
+    abstract
+  private
+    FName: string;
+    FParent: TASARDir;
+  protected
+    FASAR: TASAR;
+  public
+    constructor Create(const ASAR: TASAR; const Parent: TASARDir; const Name: string); virtual;
+
+    property Name: string read FName;
+  end;
+
+  TASARDir = class(TASAREntry)
+  private
+    FChildren: TList<TASAREntry>;
+  public
+    constructor Create(const ASAR: TASAR; const Parent: TASARDir; const Name: string); override;
+    destructor Destroy; override;
+
+    function WriteJSON(const Parent: TJSONObject): TJSONObject;
+    function FindEntry(const Name: string; T: TClass): TASAREntry;
+  end;
+
+  TASARFile = class(TASAREntry)
+  private
+    FSize: Integer;
+    FOffset: Integer;
+    FExecutable: Boolean;
+    FUnpacked: Boolean;
+    FContents: TMemoryStream;
+    FNewFile: Boolean;
+
+    function FGetSize: Int64;
+    function FGetContents: TMemoryStream;
+    procedure FSetContents(const Value: TMemoryStream);
+  public
+    constructor Create(const ASAR: TASAR; const Parent: TASARDir; const Name: string); overload; override;
+    constructor Create(const ASAR: TASAR; const Parent: TASARDir; const Name: string; const JSONObject: TJSONObject); overload;
+    destructor Destroy; override;
+
+    procedure WriteJSON(const Parent: TJSONObject; const Offset: Integer);
+    function WriteContents(const Offset, DataOffset: Integer; const Dest: TMemoryStream): Integer;
+
+    property Size: Int64 read FGetSize;
+    property Contents: TMemoryStream read FGetContents write FSetContents;
+  end;
+
+  TReadInfo = class
+  private
+    FKeyName: string;
+    FDir: TASARDir;
+    FJSONObject: TJSONObject;
+  public
+    constructor Create(const Dir: TASARDir; const KeyName: string; const JSONObject: TJSONObject);
+
+    property KeyName: string read FKeyName;
+    property Dir: TASARDir read FDir;
+    property JSONObject: TJSONObject read FJSONObject;
+  end;
+
+  TWriteInfo = class
+  private
+    FEntry: TASAREntry;
+    FJSONObject: TJSONObject;
+  public
+    constructor Create(const Entry: TASAREntry; const JSONObject: TJSONObject);
+
+    property Entry: TASAREntry read FEntry;
+    property JSONObject: TJSONObject read FJSONObject;
+  end;
+
+  TASAR = class
+  private
+    FContents: TMemoryStream;
+
+    FDataOffset: Integer;
+
+    FRoot: TASARDir;
+  public
+    constructor Create;
+    destructor Destroy; override;
+
+    procedure Read(const FileName: string);
+    procedure Write(const FileName: string);
+
+    property Root: TASARDir read FRoot;
+  end;
+
+implementation
+
+{ TASAREntry }
+
+constructor TASAREntry.Create(const ASAR: TASAR; const Parent: TASARDir; const Name: string);
+begin
+  FASAR := ASAR;
+  FParent := Parent;
+  FName := Name;
+  if Assigned(Parent) then
+    Parent.FChildren.Add(Self);
+end;
+
+{ TASARDir }
+
+constructor TASARDir.Create(const ASAR: TASAR; const Parent: TASARDir; const Name: string);
+begin
+  inherited;
+
+  FChildren := TList<TASAREntry>.Create;
+end;
+
+destructor TASARDir.Destroy;
+var
+  ASAREntry: TASAREntry;
+begin
+  for ASAREntry in FChildren do
+    ASAREntry.Free;
+
+  FChildren.Free;
+
+  inherited;
+end;
+
+function TASARDir.FindEntry(const Name: string; T: TClass): TASAREntry;
+var
+  Idx: Integer;
+  SearchList: TList<TASAREntry>;
+  ASAREntry: TASAREntry;
+begin
+  Result := nil;
+  SearchList := TList<TASAREntry>.Create;
+  SearchList.Add(Self);
+  try
+    Idx := 0;
+    while Idx < SearchList.Count do
+    begin
+      if (SearchList[Idx].Name = Name) and (SearchList[Idx].ClassType = T) then
+        Exit(SearchList[Idx]);
+
+      if (SearchList[Idx].ClassType = TASARDir) then
+        for ASAREntry in (TASARDir(SearchList[Idx])).FChildren do
+          SearchList.Add(ASAREntry);
+
+      Inc(Idx);
+    end;
+  finally
+    SearchList.Free;
+  end;
+end;
+
+function TASARDir.WriteJSON(const Parent: TJSONObject): TJSONObject;
+var
+  JSONDir, JSONFiles: TJSONObject;
+begin
+  if Trim(FName) = '' then
+    raise Exception.Create('Trim(FName) = ''''');
+
+  JSONDir := TJSONObject.Create;
+  JSONFiles := TJSONObject.Create;
+
+  JSONDir.Add('files', JSONFiles);
+
+  Parent.Add(FName, JSONDir);
+
+  Result := JSONFiles;
+end;
+
+{ TASARFile }
+
+constructor TASARFile.Create(const ASAR: TASAR; const Parent: TASARDir; const Name: string);
+begin
+  inherited;
+
+  FNewFile := True;
+end;
+
+constructor TASARFile.Create(const ASAR: TASAR; const Parent: TASARDir; const Name: string; const JSONObject: TJSONObject);
+begin
+  inherited Create(ASAR, Parent, Name);
+
+  FSize := JSONObject.Get('size', 0);
+  FOffset := StrToInt(JSONObject.Get('offset', '0'));
+  FExecutable := JSONObject.Get('executable', False);
+  FUnpacked := JSONObject.Get('unpacked', False);
+end;
+
+destructor TASARFile.Destroy;
+begin
+  if Assigned(FContents) then
+    FContents.Free;
+
+  inherited;
+end;
+
+function TASARFile.FGetContents: TMemoryStream;
+begin
+  if FUnpacked then
+    raise Exception.Create('FUnpacked');
+
+  if Assigned(FContents) then
+    Exit(FContents);
+
+  FContents := TMemoryStream.Create;
+
+  if FSize > 0 then
+  begin
+    FASAR.FContents.Position := FASAR.FDataOffset + FOffset;
+    FContents.CopyFrom(FASAR.FContents, FSize);
+    FContents.Position := 0;
+  end;
+
+  Result := FContents;
+end;
+
+function TASARFile.FGetSize: Int64;
+begin
+  if FContents = nil then
+    Result := FSize
+  else
+    Result := FContents.Size;
+end;
+
+procedure TASARFile.FSetContents(const Value: TMemoryStream);
+begin
+  if FUnpacked then
+    raise Exception.Create('FUnpacked');
+
+  if Assigned(FContents) then
+    FContents.Free;
+
+  FContents := Value;
+end;
+
+procedure TASARFile.WriteJSON(const Parent: TJSONObject; const Offset: Integer);
+var
+  JSONFile: TJSONObject;
+begin
+  if Trim(FName) = '' then
+    raise Exception.Create('Trim(FName) = ''''');
+
+  if not Assigned(FContents) and FNewFile then
+    raise Exception.Create('not Assigned(FContents) and FNewFile');
+
+  JSONFile := TJSONObject.Create;
+
+  JSONFile.Add('size', Size);
+  if not FUnpacked then
+    JSONFile.Add('offset', IntToStr(Offset));
+  if FExecutable then
+    JSONFile.Add('executable', FExecutable);
+  if FUnpacked then
+    JSONFile.Add('unpacked', FUnpacked);
+
+  Parent.Add(FName, JSONFile);
+end;
+
+function TASARFile.WriteContents(const Offset, DataOffset: Integer; const Dest: TMemoryStream): Integer;
+var
+  OldPos: Int64;
+begin
+  Result := Offset;
+
+  if (Size > 0) and (not FUnpacked) then
+    if Assigned(FContents) then
+    begin
+      OldPos := FContents.Position;
+      FContents.Position := 0;
+      Dest.CopyFrom(FContents, FContents.Size);
+      FContents.Position := OldPos;
+      Exit(Offset + FContents.Size);
+    end else
+    begin
+      FASAR.FContents.Position := DataOffset + FOffset;
+      Dest.CopyFrom(FASAR.FContents, FSize);
+      Result := Offset + Size;
+    end;
+end;
+
+{ TReadInfo }
+
+constructor TReadInfo.Create(const Dir: TASARDir; const KeyName: string; const JSONObject: TJSONObject);
+begin
+  FKeyName := KeyName;
+  FDir := Dir;
+  FJSONObject := JSONObject;
+end;
+
+{ TWriteInfo }
+
+constructor TWriteInfo.Create(const Entry: TASAREntry; const JSONObject: TJSONObject);
+begin
+  FEntry := Entry;
+  FJSONObject := JSONObject;
+end;
+
+{ TASAR }
+
+constructor TASAR.Create;
+begin
+  FContents := TMemoryStream.Create;
+end;
+
+destructor TASAR.Destroy;
+begin
+  if Assigned(FRoot) then
+    FRoot.Free;
+
+  FContents.Free;
+
+  inherited;
+end;
+
+procedure TASAR.Read(const FileName: string);
+var
+  i, Idx: Integer;
+  PickleLen, IndexLen, JSONLen: UInt32;
+  JSONObject: TJSONObject;
+  DirObj: TASARDir;
+  ReadInfo: TReadInfo;
+  Items: TList<TReadInfo>;
+  JSONString: AnsiString;
+begin
+  FContents.LoadFromFile(FileName);
+
+  Items := TList<TReadInfo>.Create;
+  try
+    if Assigned(FRoot) then
+      FRoot.Free;
+
+    FRoot := TASARDir.Create(Self, nil, '');
+    try
+      FContents.Position := 0;
+      FContents.ReadBuffer(PickleLen, SizeOf(UInt32)); // Length of first pickle
+      FContents.ReadBuffer(IndexLen, SizeOf(UInt32));  // Value of first pickle
+      FContents.ReadBuffer(PickleLen, SizeOf(UInt32)); // Length of second pickle
+      FContents.ReadBuffer(JSONLen, SizeOf(UInt32));   // Length of JSON data
+
+      FDataOffset := SizeOf(UInt32) * 2 + IndexLen;
+
+      SetLength(JSONString, JSONLen);
+      FContents.Read(JSONString[1], JSONLen);
+      JSONObject := TJSONObject(TJSONObject(GetJSON(JSONString, False)).Items[0]);
+
+      for i := 0 to JSONObject.Count - 1 do
+        Items.Add(TReadInfo.Create(FRoot, JSONObject.Names[i], TJSONObject(JSONObject.Items[i])));
+
+      try
+        Idx := 0;
+        while Idx < Items.Count do
+        begin
+          ReadInfo := TReadInfo(Items[Idx]);
+
+          if (ReadInfo.JSONObject.Count = 1) and (ReadInfo.JSONObject.Names[0] = 'files') then
+          begin
+            DirObj := TASARDir.Create(Self, ReadInfo.Dir, ReadInfo.KeyName);
+
+            for i := 0 to TJSONObject(ReadInfo.JSONObject.Items[0]).Count - 1 do
+              Items.Add(TReadInfo.Create(DirObj, TJSONObject(ReadInfo.JSONObject.Items[0]).Names[i], TJSONObject(ReadInfo.JSONObject.Items[0].Items[i])));
+          end else
+            TASARFile.Create(Self, ReadInfo.Dir, ReadInfo.KeyName, ReadInfo.JSONObject);
+
+          Inc(Idx);
+        end;
+      finally
+        JSONObject.Free;
+      end;
+    except
+      FreeAndNil(FRoot);
+      raise;
+    end;
+  finally
+    for ReadInfo in Items do
+      ReadInfo.Free;
+
+    Items.Free;
+  end;
+end;
+
+procedure TASAR.Write(const FileName: string);
+var
+  Idx, Offset: Integer;
+  WriteInt: UInt32;
+  JSONObject, JSONFiles: TJSONObject;
+  Dest, DestContents: TMemoryStream;
+  Items: TList<TWriteInfo>;
+  WriteInfo: TWriteInfo;
+  ASAREntry: TASAREntry;
+  ASARDir: TASARDir;
+  ASARFile: TASARFile;
+  FileDir: string;
+  JSONString: AnsiString;
+begin
+  Offset := 0;
+
+  Dest := TMemoryStream.Create;
+  DestContents := TMemoryStream.Create;
+
+  JSONObject := TJSONObject.Create;
+
+  JSONFiles := TJSONObject.Create;
+  JSONObject.Add('files', JSONFiles);
+
+  Items := TList<TWriteInfo>.Create;
+
+  try
+    for ASAREntry in FRoot.FChildren do
+      Items.Add(TWriteInfo.Create(ASAREntry, JSONFiles));
+
+    Idx := 0;
+    while Idx < Items.Count do
+    begin
+      if Items[Idx].FEntry.ClassType = TASARDir then
+      begin
+        ASARDir := TASARDir(Items[Idx].Entry);
+
+        JSONFiles := ASARDir.WriteJSON(Items[Idx].JSONObject);
+
+        for ASAREntry in ASARDir.FChildren do
+          Items.Add(TWriteInfo.Create(ASAREntry, JSONFiles));
+      end else if Items[Idx].Entry.ClassType = TASARFile then
+      begin
+        ASARFile := TASARFile(Items[Idx].Entry);
+
+        ASARFile.WriteJSON(Items[Idx].JSONObject, Offset);
+
+        Offset := ASARFile.WriteContents(Offset, FDataOffset, DestContents);
+      end;
+
+      Inc(Idx);
+    end;
+
+    JSONObject.CompressedJSON := True;
+    JSONString := JSONObject.AsJSON;
+
+    // Length of first pickle
+    WriteInt := 4;
+    Dest.Write(WriteInt, SizeOf(WriteInt));
+
+    // Value of first pickle
+    WriteInt := 4 + 4 + Length(JSONString);
+    Dest.Write(WriteInt, SizeOf(WriteInt));
+
+    // Length of second pickle
+    WriteInt := 4 + Length(JSONString);
+    Dest.Write(WriteInt, SizeOf(WriteInt));
+
+    // Length of JSON data
+    WriteInt := Length(JSONString);
+    Dest.Write(WriteInt, SizeOf(WriteInt));
+
+    Dest.Write(JSONString[1], Length(JSONString));
+
+    DestContents.Position := 0;
+    Dest.CopyFrom(DestContents, DestContents.Size);
+
+    FileDir := ExtractFileDir(FileName);
+    if not DirectoryExists(FileDir) then
+      if not CreateDir(FileDir) then
+        raise Exception.Create(Format('Could not create directory "%s"', [FileDir]));
+
+    Dest.SaveToFile(FileName);
+  finally
+    Dest.Free;
+    DestContents.Free;
+
+    JSONObject.Free;
+
+    for WriteInfo in Items do
+      WriteInfo.Free;
+
+    Items.Free;
+  end;
+end;
+
+end.

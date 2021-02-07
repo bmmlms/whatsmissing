@@ -1,0 +1,7 @@
+[submodule "SubModules/DDetours"]
+	path = SubModules/DDetours
+	url = https://github.com/MahdiSafsafi/DDetours
+[submodule "SubModules/ImmersiveColors"]
+	path = SubModules/ImmersiveColors
+	url = https://github.com/MahdiSafsafi/ImmersiveColors
+	branch = next
