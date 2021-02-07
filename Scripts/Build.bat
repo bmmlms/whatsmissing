@@ -54,4 +54,3 @@ GOTO END
   PAUSE
 
 :END
-  cd %startdir%
