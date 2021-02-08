@@ -24,7 +24,7 @@ WhatsMissing is a launcher that provides some extensions to the official Windows
 - [WhatsApp Client](https://www.whatsapp.com/download) (64 and 32 Bit supported)
 
 ### Installation
-Download the installer from "Releases" and run it. WhatsMissing will install itself to %APPDATALOCAL%\WhatsMissing, configuration and resource cache will be located at %APPDATA%\WhatsMissing after first start.
+Download the installer from "Releases" and run it. WhatsMissing will install itself to %LOCALAPPDATA%\WhatsMissing, configuration and resource cache will be located at %APPDATA%\WhatsMissing after first start.
 
 WhatsApp shortcuts in the start menu/taskbar/desktop are modified by the installer to start the WhatsMissing executable which in turn starts WhatsApp with the extensions.
 
