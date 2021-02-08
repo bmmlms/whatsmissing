@@ -40,7 +40,7 @@
             <Filename Value="..\Build\WhatsMissing-$(TargetCPU)"/>
           </Target>
           <SearchPaths>
-            <IncludeFiles Value="$(ProjOutDir)"/>
+            <IncludeFiles Value="..\SubModules\ImmersiveColors\Source"/>
             <OtherUnitFiles Value="..\Shared;..\SubModules\DDetours\Source;..\SubModules\ImmersiveColors\Source"/>
             <UnitOutputDirectory Value="..\Build\DCU\$(TargetCPU)"/>
           </SearchPaths>
@@ -149,7 +149,7 @@
       <Filename Value="..\Build\WhatsMissing-$(TargetCPU)"/>
     </Target>
     <SearchPaths>
-      <IncludeFiles Value="$(ProjOutDir)"/>
+      <IncludeFiles Value="..\SubModules\ImmersiveColors\Source"/>
       <OtherUnitFiles Value="..\Shared;..\SubModules\DDetours\Source;..\SubModules\ImmersiveColors\Source"/>
       <UnitOutputDirectory Value="..\Build\DCU\$(TargetCPU)"/>
     </SearchPaths>

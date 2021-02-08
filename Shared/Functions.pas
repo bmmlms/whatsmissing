@@ -90,8 +90,7 @@ type
 implementation
 
 const
-  SID_IPropertyStore = '{886d8eeb-8cf2-4446-8d02-cdba1dbdcf99}';
-  IID_IPropertyStore: TGUID = SID_IPropertyStore;
+  IID_IPropertyStore: TGUID = '{886d8eeb-8cf2-4446-8d02-cdba1dbdcf99}';
 
   PKEY_AppUserModel_RelaunchCommand: PROPERTYKEY = (fmtid: '{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}'; pid: 2);
   PKEY_AppUserModel_RelaunchDisplayNameResource: PROPERTYKEY = (fmtid: '{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}'; pid: 4);

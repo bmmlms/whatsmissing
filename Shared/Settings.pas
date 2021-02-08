@@ -10,51 +10,65 @@ uses
   jsonparser,
   SysUtils;
 
+{$I ImmersiveType.inc}
+
 type
   TResourcePatchAction = (rpaNone, rpaImmersive, rpaCustom);
 
-  TResourcePatch = class
+  TResourcePatchBase = class
     abstract
   private
-    FID: Integer;
-    FDescription: string;
-    FColorCustom: TColor;
-    FColorImmersive: Integer;
-    FAction: TResourcePatchAction;
   public
-    constructor Create(const ID: Integer; const Description: string; const ColorCustom: TColor; const ColorImmersive: Integer; const Action: TResourcePatchAction); virtual;
-
     function Execute(const Source: string; const Color: TColor): string; virtual; abstract;
-
-    property ID: Integer read FID;
-    property Description: string read FDescription;
-    property ColorCustom: TColor read FColorCustom write FColorCustom;
-    property ColorImmersive: Integer read FColorImmersive write FColorImmersive;
-    property Action: TResourcePatchAction read FAction write FAction;
   end;
 
-  TResourcePatchColor = class(TResourcePatch)
+  TResourcePatchColor = class(TResourcePatchBase)
   private
     FSearchColor: TColor;
   public
-    constructor Create(const ID: Integer; const Description: string; const SearchColor, ColorCustom: TColor; const ColorImmersive: Integer; const Action: TResourcePatchAction); reintroduce;
+    constructor Create(const SearchColor: TColor);
 
     function Execute(const Source: string; const Color: TColor): string; override;
 
     property SearchColor: TColor read FSearchColor;
   end;
 
-  TResourcePatchText = class(TResourcePatch)
+  TResourcePatchText = class(TResourcePatchBase)
   private
     FSearchText: string;
     FReplaceText: string;
+    FUseRGBNotation: Boolean;
   public
-    constructor Create(const ID: Integer; const Description, SearchText, ReplaceText: string; const ColorCustom: TColor; const ColorImmersive: Integer; const Action: TResourcePatchAction); reintroduce;
+    constructor Create(const SearchText, ReplaceText: string; const UseRGBNotation: Boolean);
 
     function Execute(const Source: string; const Color: TColor): string; override;
 
     property SearchText: string read FSearchText;
     property ReplaceText: string read FReplaceText;
+  end;
+
+  TResourcePatchArray = array of TResourcePatchBase;
+
+  TResourcePatchCollection = class
+  private
+    FID: Integer;
+    FDescription: string;
+    FColorCustom: TColor;
+    FColorImmersive: Integer;
+    FAction: TResourcePatchAction;
+    FPatches: TResourcePatchArray;
+  public
+    constructor Create(const ID: Integer; const Description: string; const ColorCustom: TColor; const ColorImmersive: Integer; const Action: TResourcePatchAction; const Patches: TResourcePatchArray);
+    destructor Destroy; override;
+
+    function Execute(const Source: string; const Color: TColor): string;
+
+    property ID: Integer read FID;
+    property Description: string read FDescription;
+    property ColorCustom: TColor read FColorCustom write FColorCustom;
+    property ColorImmersive: Integer read FColorImmersive write FColorImmersive;
+    property Action: TResourcePatchAction read FAction write FAction;
+    property Patches: TResourcePatchArray read FPatches;
   end;
 
   TSettings = class
@@ -63,7 +77,7 @@ type
 
     FRebuildResources: Boolean;
 
-    FResourcePatches: TList<TResourcePatch>;
+    FResourcePatches: TList<TResourcePatchCollection>;
 
     FShowNotificationIcon: Boolean;
     FIndicateNewMessages: Boolean;
@@ -81,7 +95,7 @@ type
 
     property RebuildResources: Boolean read FRebuildResources write FRebuildResources;
 
-    property ResourcePatches: TList<TResourcePatch> read FResourcePatches;
+    property ResourcePatches: TList<TResourcePatchCollection> read FResourcePatches;
 
     property ShowNotificationIcon: Boolean read FShowNotificationIcon write FShowNotificationIcon;
     property IndicateNewMessages: Boolean read FIndicateNewMessages write FIndicateNewMessages;
@@ -96,7 +110,7 @@ constructor TSettings.Create(const FilePath: string);
 begin
   FFilePath := FilePath;
 
-  FResourcePatches := TList<TResourcePatch>.Create;
+  FResourcePatches := TList<TResourcePatchCollection>.Create;
 
   Reset;
 
@@ -105,7 +119,7 @@ end;
 
 destructor TSettings.Destroy;
 var
-  ResourcePatch: TResourcePatch;
+  ResourcePatch: TResourcePatchCollection;
 begin
   for ResourcePatch in FResourcePatches do
     ResourcePatch.Free;
@@ -120,7 +134,7 @@ var
   JSONEnum: TJSONEnum;
   JSONObject, JSONObjectResource: TJSONObject;
   JSONArray: TJSONArray;
-  ResourcePatch: TResourcePatch;
+  ResourcePatch: TResourcePatchCollection;
   FS: TFileStream;
 begin
   try
@@ -153,7 +167,6 @@ begin
               ResourcePatch.ColorImmersive := JSONObjectResource.Get('ColorImmersive', 0);
               Break;
             end;
-
         end;
       finally
         JSONObject.Free;
@@ -171,7 +184,7 @@ var
   JSONString: AnsiString;
   JSONObject, JSONObjectResource: TJSONObject;
   JSONArray: TJSONArray;
-  ResourcePatch: TResourcePatch;
+  ResourcePatch: TResourcePatchCollection;
   FS: TFileStream;
 begin
   if not DirectoryExists(ExtractFileDir(FFilePath)) then
@@ -216,16 +229,9 @@ end;
 
 procedure TSettings.Reset;
 const
-  ImmersiveSystemAccent = 1203;
-  ImmersiveLightBorder = 943;
-  ImmersiveControlLightProgressForeground = 326;
-  ImmersiveSystemAccentLight3 = 1209;
-  ImmersiveControlDefaultLightButtonBackgroundHover = 258;
-  ImmersiveHardwareTitleBarCloseButtonHover = 868;
-
   clDefault = $20000000;
 var
-  ResourcePatch: TResourcePatch;
+  ResourcePatch: TResourcePatchCollection;
 begin
   FRebuildResources := False;
 
@@ -234,17 +240,31 @@ begin
   FResourcePatches.Clear;
 
   // --teal-lighter
-  FResourcePatches.Add(TResourcePatchColor.Create(1, 'Titlebar', TFunctions.HTMLToColor('00bfa5'), clDefault, Integer(ImmersiveSystemAccent), rpaImmersive));
-  // --intro-border
-  FResourcePatches.Add(TResourcePatchColor.Create(2, 'Intro border', TFunctions.HTMLToColor('4adf83'), clDefault, Integer(ImmersiveLightBorder), rpaImmersive));
-  // --progress-primary
-  FResourcePatches.Add(TResourcePatchColor.Create(3, 'Progressbar', TFunctions.HTMLToColor('00d9bb'), clDefault, Integer(ImmersiveControlLightProgressForeground), rpaImmersive));
-  // --unread-marker-background
-  FResourcePatches.Add(TResourcePatchColor.Create(4, 'Unread message badge', TFunctions.HTMLToColor('06d755'), clDefault, Integer(ImmersiveSystemAccentLight3), rpaImmersive));
+  FResourcePatches.Add(TResourcePatchCollection.Create(1, 'Titlebar', clDefault, Integer(ImmersiveSystemAccent), rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('00bfa5'))]));
 
-  FResourcePatches.Add(TResourcePatchText.Create(5, 'Minimize button hover color', '#windows-title-minimize:hover{background-color:var(--teal-hover)}', '#windows-title-minimize:hover{background-color:#%COLOR%}', clDefault, Integer(ImmersiveControlDefaultLightButtonBackgroundHover), rpaImmersive));
-  FResourcePatches.Add(TResourcePatchText.Create(6, 'Maximize button hover color', '#windows-title-maximize:hover{background-color:var(--teal-hover)}', '#windows-title-maximize:hover{background-color:#%COLOR%}', clDefault, Integer(ImmersiveControlDefaultLightButtonBackgroundHover), rpaImmersive));
-  FResourcePatches.Add(TResourcePatchText.Create(7, 'Close button hover color', '#windows-title-close:hover{background-color:var(--teal-hover)}', '#windows-title-close:hover{background-color:#%COLOR%}', clDefault, Integer(ImmersiveHardwareTitleBarCloseButtonHover), rpaImmersive));
+  // --intro-border
+  FResourcePatches.Add(TResourcePatchCollection.Create(2, 'Intro border', clDefault, Integer(ImmersiveLightBorder), rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('4adf83'))]));
+
+  // --progress-primary
+  FResourcePatches.Add(TResourcePatchCollection.Create(3, 'Progressbar', clDefault, Integer(ImmersiveControlLightProgressForeground), rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('00d9bb'))]));
+
+  // --unread-marker-background
+  FResourcePatches.Add(TResourcePatchCollection.Create(4, 'Unread message badge', clDefault, Integer(ImmersiveSystemAccentLight3), rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('06d755'))]));
+
+  FResourcePatches.Add(TResourcePatchCollection.Create(8, 'Background of incoming messages', clDefault, Integer(ImmersiveLightChromeLow), rpaImmersive,
+    [TResourcePatchText.Create('--incoming-background:#fff;', '--incoming-background:#%COLOR%;', False), TResourcePatchText.Create('--incoming-background-rgb:255,255,255;', '--incoming-background-rgb:%COLOR%;', True)]));
+
+  FResourcePatches.Add(TResourcePatchCollection.Create(9, 'Background of outgoing messages', clDefault, Integer(ImmersiveLightChromeHigh), rpaImmersive,
+    [TResourcePatchText.Create('--outgoing-background:#dcf8c6;', '--outgoing-background:#%COLOR%;', False), TResourcePatchText.Create('--outgoing-background-rgb:220,248,198;', '--outgoing-background-rgb:%COLOR%;', True)]));
+
+  FResourcePatches.Add(TResourcePatchCollection.Create(5, 'Minimize button hover color', clDefault, Integer(ImmersiveControlDefaultLightButtonBackgroundHover), rpaImmersive,
+    [TResourcePatchText.Create('#windows-title-minimize:hover{background-color:var(--teal-hover)}', '#windows-title-minimize:hover{background-color:#%COLOR%}', False)]));
+
+  FResourcePatches.Add(TResourcePatchCollection.Create(6, 'Maximize button hover color', clDefault, Integer(ImmersiveControlDefaultLightButtonBackgroundHover), rpaImmersive,
+    [TResourcePatchText.Create('#windows-title-maximize:hover{background-color:var(--teal-hover)}', '#windows-title-maximize:hover{background-color:#%COLOR%}', False)]));
+
+  FResourcePatches.Add(TResourcePatchCollection.Create(7, 'Close button hover color', clDefault, Integer(ImmersiveHardwareTitleBarCloseButtonHover), rpaImmersive,
+    [TResourcePatchText.Create('#windows-title-close:hover{background-color:var(--teal-hover)}', '#windows-title-close:hover{background-color:#%COLOR%}', False)]));
 
   FShowNotificationIcon := True;
   FIndicateNewMessages := True;
@@ -252,26 +272,11 @@ begin
   FAlwaysOnTop := False;
 end;
 
-{ TResourcePatch }
-
-constructor TResourcePatch.Create(const ID: Integer; const Description: string; const ColorCustom: TColor; const ColorImmersive: Integer; const Action: TResourcePatchAction);
-begin
-  FID := ID;
-  FDescription := Description;
-  FColorCustom := ColorCustom;
-  FColorImmersive := ColorImmersive;
-  FAction := Action;
-end;
-
 { TResourcePatchColor }
 
-constructor TResourcePatchColor.Create(const ID: Integer; const Description: string; const SearchColor, ColorCustom: TColor; const ColorImmersive: Integer; const Action: TResourcePatchAction);
+constructor TResourcePatchColor.Create(const SearchColor: TColor);
 begin
-  inherited Create(ID, Description, ColorCustom, ColorImmersive, Action);
-
   FSearchColor := SearchColor;
-  FColorCustom := ColorCustom;
-  FColorImmersive := ColorImmersive;
 end;
 
 function TResourcePatchColor.Execute(const Source: string; const Color: TColor): string;
@@ -281,17 +286,45 @@ end;
 
 { TResourcePatchText }
 
-constructor TResourcePatchText.Create(const ID: Integer; const Description, SearchText, ReplaceText: string; const ColorCustom: TColor; const ColorImmersive: Integer; const Action: TResourcePatchAction);
+constructor TResourcePatchText.Create(const SearchText, ReplaceText: string; const UseRGBNotation: Boolean);
 begin
-  inherited Create(ID, Description, ColorCustom, ColorImmersive, Action);
-
   FSearchText := SearchText;
   FReplaceText := ReplaceText;
+  FUseRGBNotation := UseRGBNotation;
 end;
 
 function TResourcePatchText.Execute(const Source: string; const Color: TColor): string;
 begin
-  Result := Source.Replace(SearchText, ReplaceText.Replace('%COLOR%', TFunctions.ColorToHTML(Color).ToLower, []), []);
+  Result := Source.Replace(SearchText, ReplaceText.Replace('%COLOR%', IfThen<string>(FUseRGBNotation, TFunctions.ColorToRGBHTML(Color), TFunctions.ColorToHTML(Color).ToLower), []), []);
+end;
+
+{ TResourcePatchCollection }
+
+constructor TResourcePatchCollection.Create(const ID: Integer; const Description: string; const ColorCustom: TColor; const ColorImmersive: Integer; const Action: TResourcePatchAction; const Patches: TResourcePatchArray);
+begin
+  FID := ID;
+  FDescription := Description;
+  FColorCustom := ColorCustom;
+  FColorImmersive := ColorImmersive;
+  FAction := Action;
+  FPatches := Patches;
+end;
+
+destructor TResourcePatchCollection.Destroy;
+var
+  ResourcePatch: TResourcePatchBase;
+begin
+  for ResourcePatch in Patches do
+    ResourcePatch.Free;
+end;
+
+function TResourcePatchCollection.Execute(const Source: string; const Color: TColor): string;
+var
+  Patch: TResourcePatchBase;
+begin
+  Result := Source;
+  for Patch in Patches do
+    Result := Patch.Execute(Result, Color);
 end;
 
 end.

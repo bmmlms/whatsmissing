@@ -30,7 +30,7 @@ type
     procedure CleanUp;
     function ExistsUnpatched: Boolean;
 
-    class function GetColor(const ResourcePatch: TResourcePatch): TColor; static;
+    class function GetColor(const ResourcePatch: TResourcePatchCollection): TColor; static;
   end;
 
 implementation
@@ -48,7 +48,7 @@ var
   ASAR: TASAR;
   ASARCSS: TASARFile;
   CSS: AnsiString;
-  ResourcePatch: TResourcePatch;
+  ResourcePatch: TResourcePatchCollection;
   StaticReplace: TStaticReplace;
 const
   StaticReplacements: array[0..5] of TStaticReplace = (
@@ -181,13 +181,13 @@ begin
       Exit(True);
 end;
 
-class function TResourcePatcher.GetColor(const ResourcePatch: TResourcePatch): TColor;
+class function TResourcePatcher.GetColor(const ResourcePatch: TResourcePatchCollection): TColor;
 begin
   case ResourcePatch.Action of
     rpaNone:
       Result := clNone;
     rpaImmersive:
-      Result := AlphaColorToColor(GetActiveImmersiveColor(TImmersiveColorType(ResourcePatch.ColorImmersive), clNone));
+      Result := AlphaColorToColor(GetActiveImmersiveColor(ImmersiveColors.TImmersiveColorType(ResourcePatch.ColorImmersive), clNone));
     rpaCustom:
       Result := ResourcePatch.ColorCustom;
     else
@@ -196,6 +196,4 @@ begin
 end;
 
 end.
-
-
 

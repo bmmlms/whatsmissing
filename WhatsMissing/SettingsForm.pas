@@ -26,7 +26,7 @@ type
     FComboAction: TComboBox;
     FPanelColor: TPanel;
 
-    FResourcePatch: TResourcePatch;
+    FResourcePatch: TResourcePatchCollection;
 
     procedure UpdateColor;
     procedure ComboReplaceTypeSelect(Sender: TObject);
@@ -34,7 +34,7 @@ type
   protected
     procedure SetParent(AParent: TWinControl); override;
   public
-    constructor Create(const AOwner: TComponent; const ResourcePatch: TResourcePatch); reintroduce;
+    constructor Create(const AOwner: TComponent; const ResourcePatch: TResourcePatchCollection); reintroduce;
   published
   end;
 
@@ -99,7 +99,7 @@ end;
 
 procedure TfrmSettings.FormShow(Sender: TObject);
 var
-  ResourcePatch: TResourcePatch;
+  ResourcePatch: TResourcePatchCollection;
   RPC: TResourcePatchControl;
 begin
   chkShowNotificationIcon.Checked := FSettings.ShowNotificationIcon;
@@ -216,7 +216,7 @@ end;
 
 { TResourcePatchControl }
 
-constructor TResourcePatchControl.Create(const AOwner: TComponent; const ResourcePatch: TResourcePatch);
+constructor TResourcePatchControl.Create(const AOwner: TComponent; const ResourcePatch: TResourcePatchCollection);
 begin
   inherited Create(AOwner);
 
@@ -227,6 +227,7 @@ procedure TResourcePatchControl.SetParent(AParent: TWinControl);
 var
   i: Integer;
   Found: Boolean;
+  PanelColorContainer: TPanel;
 begin
   inherited;
 
@@ -240,12 +241,18 @@ begin
   FLabelDescription.Layout := tlCenter;
   FLabelDescription.Parent := Self;
 
+  PanelColorContainer := TPanel.Create(Self);
+  PanelColorContainer.Align := alRight;
+  PanelColorContainer.BevelOuter := bvNone;
+  PanelColorContainer.BorderStyle := bsNone;
+  PanelColorContainer.Parent := Self;
+
   FPanelColor := TPanel.Create(Self);
-  FPanelColor.Align := alRight;
+  FPanelColor.Align := alClient;
   FPanelColor.BevelOuter := bvNone;
   FPanelColor.BorderStyle := bsSingle;
   FPanelColor.ParentBackground := False;
-  FPanelColor.Parent := Self;
+  FPanelColor.Parent := PanelColorContainer;
 
   FComboAction := TComboBox.Create(Self);
   FComboAction.Align := alRight;
@@ -254,7 +261,7 @@ begin
   FComboAction.BorderSpacing.Right := 8;
   FComboAction.Parent := Self;
 
-  FPanelColor.Width := FComboAction.Height;
+  PanelColorContainer.Width := FComboAction.Height;
 
   FComboAction.Items.AddObject('Use default', Pointer(rpaNone));
   if OsSupportsImmersiveColors then

@@ -280,6 +280,7 @@ begin
         begin
           if (IsWindowVisible(FHandle) and (IsIconic(FHandle) or (FLastForegroundWindowHandle <> FHandle))) or (not IsWindowVisible(FHandle)) or FNewMessages then
           begin
+            {
             if FNewMessages then
             begin
               // If unread chat messages exist select the first chat after opening the window
@@ -288,6 +289,7 @@ begin
               SendMessage(FHandle, WM_LBUTTONDOWN, 0, MAKELPARAM(10, 170));
               SendMessage(FHandle, WM_LBUTTONUP, 0, MAKELPARAM(10, 170));
             end;
+            }
             ShowMainWindow;
 
             FLastForegroundWindowHandle := FHandle;
