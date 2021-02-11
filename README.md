@@ -1,6 +1,6 @@
 # WhatsMissing
 
-WhatsMissing is a launcher that provides some extensions to the official Windows WhatsApp Client.
+WhatsMissing is a launcher that provides some extensions to the official Windows WhatsApp client.
 
 <p align="center">
   <img src="./.github/WhatsApp.png" alt="WhatsApp">
@@ -21,7 +21,7 @@ WhatsMissing is a launcher that provides some extensions to the official Windows
 - Built using Lazarus :fire:
 
 ### Requirements
-- [WhatsApp Client](https://www.whatsapp.com/download) (64 and 32 Bit supported)
+- [WhatsApp client](https://www.whatsapp.com/download) (64 and 32 Bit supported)
 
 ### Installation
 Download the installer from "Releases" and run it. WhatsMissing will install itself to %LOCALAPPDATA%\WhatsMissing, configuration and resource cache will be located at %APPDATA%\WhatsMissing after first start.
@@ -34,7 +34,7 @@ Complete uninstallation is possible using "Programs and Features".
 When WhatsApp is running right click the notification icon to open the settings dialog or toggle "Always on top". The menu entries displayed in the notification icon context menu are also accessible using the title bar context menu.
 
 ### Building
-Install Lazarus IDE and the tools to crosscompile, open the project files and build it. To use the build script "Build.bat" you need to edit its 4th line.
+Install Lazarus IDE and the tools to crosscompile, open any project file and build it. To use the build script "Build.bat" you need to edit its 4th line.
 
 ### Thanks
 - [Lazarus IDE](https://www.lazarus-ide.org)
