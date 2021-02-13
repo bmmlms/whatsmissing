@@ -26,7 +26,7 @@ type
     FComboAction: TComboBox;
     FPanelColor: TPanel;
 
-    FResourcePatch: TResourcePatchCollection;
+    FResourcePatchCollection: TResourcePatchCollection;
 
     procedure UpdateColor;
     procedure ComboReplaceTypeSelect(Sender: TObject);
@@ -34,7 +34,7 @@ type
   protected
     procedure SetParent(AParent: TWinControl); override;
   public
-    constructor Create(const AOwner: TComponent; const ResourcePatch: TResourcePatchCollection); reintroduce;
+    constructor Create(const AOwner: TComponent; const ResourcePatchCollection: TResourcePatchCollection); reintroduce;
   published
   end;
 
@@ -99,7 +99,7 @@ end;
 
 procedure TfrmSettings.FormShow(Sender: TObject);
 var
-  ResourcePatch: TResourcePatchCollection;
+  ResourcePatchCollection: TResourcePatchCollection;
   RPC: TResourcePatchControl;
 begin
   chkShowNotificationIcon.Checked := FSettings.ShowNotificationIcon;
@@ -109,9 +109,9 @@ begin
 
   chkShowNotificationIconChange(chkShowNotificationIcon);
 
-  for ResourcePatch in FSettings.ResourcePatches do
+  for ResourcePatchCollection in FSettings.ResourcePatches do
   begin
-    RPC := TResourcePatchControl.Create(grpResourcePatches, ResourcePatch);
+    RPC := TResourcePatchControl.Create(grpResourcePatches, ResourcePatchCollection);
     RPC.Align := alTop;
     RPC.Visible := True;
     RPC.Height := 10;
@@ -216,11 +216,11 @@ end;
 
 { TResourcePatchControl }
 
-constructor TResourcePatchControl.Create(const AOwner: TComponent; const ResourcePatch: TResourcePatchCollection);
+constructor TResourcePatchControl.Create(const AOwner: TComponent; const ResourcePatchCollection: TResourcePatchCollection);
 begin
   inherited Create(AOwner);
 
-  FResourcePatch := ResourcePatch;
+  FResourcePatchCollection := ResourcePatchCollection;
 end;
 
 procedure TResourcePatchControl.SetParent(AParent: TWinControl);
@@ -237,7 +237,7 @@ begin
   FLabelDescription := TLabel.Create(Self);
   FLabelDescription.Align := alLeft;
   FLabelDescription.AutoSize := True;
-  FLabelDescription.Caption := FResourcePatch.Description;
+  FLabelDescription.Caption := FResourcePatchCollection.Description;
   FLabelDescription.Layout := tlCenter;
   FLabelDescription.Parent := Self;
 
@@ -270,7 +270,7 @@ begin
 
   Found := False;
   for i := 0 to FComboAction.Items.Count - 1 do
-    if TResourcePatchAction(FComboAction.Items.Objects[i]) = FResourcePatch.Action then
+    if TResourcePatchAction(FComboAction.Items.Objects[i]) = FResourcePatchCollection.Action then
     begin
       Found := True;
       FComboAction.ItemIndex := i;
@@ -293,16 +293,16 @@ end;
 
 procedure TResourcePatchControl.UpdateColor;
 begin
-  if (not OsSupportsImmersiveColors) and (FResourcePatch.Action = rpaImmersive) then
-    FResourcePatch.Action := rpaNone;
+  if (not OsSupportsImmersiveColors) and (FResourcePatchCollection.Action = rpaImmersive) then
+    FResourcePatchCollection.Action := rpaNone;
 
-  FPanelColor.Color := TResourcePatcher.GetColor(FResourcePatch);
-  FPanelColor.Visible := FPanelColor.Color <> clNone;
+  FPanelColor.Color := TResourcePatcher.GetColor(FResourcePatchCollection, caNone);
+  FPanelColor.Visible := FResourcePatchCollection.Action <> rpaNone;
 end;
 
 procedure TResourcePatchControl.ComboReplaceTypeSelect(Sender: TObject);
 begin
-  FResourcePatch.Action := TResourcePatchAction(FComboAction.Items.Objects[FComboAction.ItemIndex]);
+  FResourcePatchCollection.Action := TResourcePatchAction(FComboAction.Items.Objects[FComboAction.ItemIndex]);
   UpdateColor;
 end;
 
@@ -312,7 +312,7 @@ var
 begin
   Dlg := TColorDialog.Create(Self);
   try
-    Dlg.Color := TResourcePatcher.GetColor(FResourcePatch);
+    Dlg.Color := TResourcePatcher.GetColor(FResourcePatchCollection, caNone);
 
     if Dlg.Execute then
     begin
@@ -320,8 +320,8 @@ begin
 
       FComboAction.ItemIndex := 2;
 
-      FResourcePatch.Action := rpaCustom;
-      FResourcePatch.ColorCustom := Dlg.Color;
+      FResourcePatchCollection.Action := rpaCustom;
+      FResourcePatchCollection.ColorCustom := Dlg.Color;
     end;
   finally
     Dlg.Free;

@@ -7,6 +7,7 @@ uses
   Classes,
   Functions,
   Graphics,
+  GraphUtil,
   ImmersiveColors,
   Paths,
   Settings,
@@ -30,7 +31,7 @@ type
     procedure CleanUp;
     function ExistsUnpatched: Boolean;
 
-    class function GetColor(const ResourcePatch: TResourcePatchCollection): TColor; static;
+    class function GetColor(const ResourcePatchCollection: TResourcePatchCollection; const ColorAdjustment: TColorAdjustment): TColor; static;
   end;
 
 implementation
@@ -48,7 +49,8 @@ var
   ASAR: TASAR;
   ASARCSS: TASARFile;
   CSS: AnsiString;
-  ResourcePatch: TResourcePatchCollection;
+  ResourcePatchCollection: TResourcePatchCollection;
+  ResourcePatch: TResourcePatchBase;
   StaticReplace: TStaticReplace;
 const
   StaticReplacements: array[0..5] of TStaticReplace = (
@@ -70,9 +72,10 @@ begin
 
     SetString(CSS, PAnsiChar(ASARCSS.Contents.Memory), ASARCSS.Contents.Size);
 
-    for ResourcePatch in FSettings.ResourcePatches do
-      if ResourcePatch.Action <> rpaNone then
-        CSS := ResourcePatch.Execute(CSS, GetColor(ResourcePatch));
+    for ResourcePatchCollection in FSettings.ResourcePatches do
+      if ResourcePatchCollection.Action <> rpaNone then
+        for ResourcePatch in ResourcePatchCollection.Patches do
+          CSS := ResourcePatch.Execute(CSS, GetColor(ResourcePatchCollection, ResourcePatch.ColorAdjustment));
 
     if FSettings.HideMaximize then
     begin
@@ -181,18 +184,20 @@ begin
       Exit(True);
 end;
 
-class function TResourcePatcher.GetColor(const ResourcePatch: TResourcePatchCollection): TColor;
+class function TResourcePatcher.GetColor(const ResourcePatchCollection: TResourcePatchCollection; const ColorAdjustment: TColorAdjustment): TColor;
 begin
-  case ResourcePatch.Action of
+  case ResourcePatchCollection.Action of
     rpaNone:
       Result := clNone;
     rpaImmersive:
-      Result := AlphaColorToColor(GetActiveImmersiveColor(ImmersiveColors.TImmersiveColorType(ResourcePatch.ColorImmersive), clNone));
+      Result := AlphaColorToColor(GetActiveImmersiveColor(ImmersiveColors.TImmersiveColorType(ResourcePatchCollection.ColorImmersive)));
     rpaCustom:
-      Result := ResourcePatch.ColorCustom;
+      Result := ResourcePatchCollection.ColorCustom;
     else
       raise Exception.Create('GetColor(): Invalid action');
   end;
+
+  Result := ColorAdjustLuma(Result, Integer(ColorAdjustment), True);
 end;
 
 end.

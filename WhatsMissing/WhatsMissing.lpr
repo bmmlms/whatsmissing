@@ -12,7 +12,6 @@ uses
   Log,
   MMF,
   Paths,
-  Registry,
   SettingsForm,
   SysUtils,
   Windows;
