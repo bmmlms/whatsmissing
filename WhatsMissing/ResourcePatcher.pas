@@ -31,7 +31,7 @@ type
     procedure CleanUp;
     function ExistsUnpatched: Boolean;
 
-    class function GetColor(const ResourcePatchCollection: TResourcePatchCollection; const ColorAdjustment: TColorAdjustment): TColor; static;
+    class function GetColor(const ResourcePatchCollection: TResourcePatchCollection; const ColorAdjustment: TResourcePatchColorAdjustment): TColor; static;
   end;
 
 implementation
@@ -43,59 +43,67 @@ type
   TStaticReplace = record
     Search: string;
     Replace: string;
-    Multiple: Boolean;
+    ReplaceFlags: TReplaceFlags;
   end;
 var
-  ASAR: TASAR;
-  ASARCSS: TASARFile;
-  CSS: AnsiString;
+  Asar: TASAR;
+  AsarCss, AsarSvgJs: TASARFile;
+  Css, SvgJs: AnsiString;
   ResourcePatchCollection: TResourcePatchCollection;
-  ResourcePatch: TResourcePatchBase;
+  ResourcePatch: TResourcePatch;
   StaticReplace: TStaticReplace;
 const
   StaticReplacements: array[0..5] of TStaticReplace = (
-    (Search: '#windows-title-minimize.blurred{opacity:.7}'; Replace: '#windows-title-minimize.blurred{opacity:1}'; Multiple: False),
-    (Search: '#windows-title-maximize.blurred{opacity:.7}'; Replace: '#windows-title-maximize.blurred{opacity:1}'; Multiple: False),
-    (Search: '#windows-title-close.blurred{opacity:.7}'; Replace: '#windows-title-close.blurred{opacity:1}'; Multiple: False),
-    (Search: '#windows-title-minimize{position:absolute;'; Replace: '#windows-title-minimize{position:absolute;cursor:default;'; Multiple: False),
-    (Search: '#windows-title-maximize{position:absolute;'; Replace: '#windows-title-maximize{position:absolute;cursor:default;'; Multiple: False),
-    (Search: '#windows-title-close{position:absolute;'; Replace: '#windows-title-close{position:absolute;cursor:default;'; Multiple: False)
-    );
+    (Search: '#windows-title-minimize.blurred{opacity:.7}'; Replace: '#windows-title-minimize.blurred{opacity:1}'; ReplaceFlags: []),
+    (Search: '#windows-title-maximize.blurred{opacity:.7}'; Replace: '#windows-title-maximize.blurred{opacity:1}'; ReplaceFlags: []),
+    (Search: '#windows-title-close.blurred{opacity:.7}'; Replace: '#windows-title-close.blurred{opacity:1}'; ReplaceFlags: []),
+    (Search: '#windows-title-minimize{position:absolute;'; Replace: '#windows-title-minimize{position:absolute;cursor:default;'; ReplaceFlags: []),
+    (Search: '#windows-title-maximize{position:absolute;'; Replace: '#windows-title-maximize{position:absolute;cursor:default;'; ReplaceFlags: []),
+    (Search: '#windows-title-close{position:absolute;'; Replace: '#windows-title-close{position:absolute;cursor:default;'; ReplaceFlags: []));
 begin
-  ASAR := TASAR.Create;
+  Asar := TASAR.Create;
   try
-    ASAR.Read(Filename);
+    Asar.Read(Filename);
 
-    ASARCSS := TASARFile(ASAR.Root.FindEntry('cssm.css', TASARFile));
-    if not Assigned(ASARCSS) then
+    AsarCss := TASARFile(Asar.Root.FindEntry('cssm.css', TASARFile));
+    if not Assigned(AsarCss) then
       raise Exception.Create('cssm.css not found');
 
-    SetString(CSS, PAnsiChar(ASARCSS.Contents.Memory), ASARCSS.Contents.Size);
+    AsarSvgJs := TASARFile(Asar.Root.FindEntry('svg.*.js', TASARFile));
+    if not Assigned(AsarSvgJs) then
+      raise Exception.Create('svg.*.js not found');
+
+    SetString(Css, PAnsiChar(AsarCss.Contents.Memory), AsarCss.Contents.Size);
+    SetString(SvgJs, PAnsiChar(AsarSvgJs.Contents.Memory), AsarSvgJs.Contents.Size);
 
     for ResourcePatchCollection in FSettings.ResourcePatches do
       if ResourcePatchCollection.Action <> rpaNone then
         for ResourcePatch in ResourcePatchCollection.Patches do
-          CSS := ResourcePatch.Execute(CSS, GetColor(ResourcePatchCollection, ResourcePatch.ColorAdjustment));
+        begin
+          if ResourcePatch.Target = rptCss then
+            Css := ResourcePatch.Execute(Css, GetColor(ResourcePatchCollection, ResourcePatch.ColorAdjustment));
+          if ResourcePatch.Target = rptJs then
+            SvgJs := ResourcePatch.Execute(SvgJs, GetColor(ResourcePatchCollection, ResourcePatch.ColorAdjustment));
+        end;
 
     if FSettings.HideMaximize then
     begin
-      CSS := CSS.Replace('#windows-title-minimize{right:90px}', '#windows-title-minimize{right:45px}', []);
-      CSS := CSS.Replace('#windows-title-maximize{position:absolute;width:45px', '#windows-title-maximize{position:absolute;width:0px', []);
+      Css := Css.Replace('#windows-title-minimize{right:90px}', '#windows-title-minimize{right:45px}', []);
+      Css := Css.Replace('#windows-title-maximize{position:absolute;width:45px', '#windows-title-maximize{position:absolute;width:0px', []);
     end;
 
     for StaticReplace in StaticReplacements do
-      if StaticReplace.Multiple then
-        CSS := CSS.Replace(StaticReplace.Search, StaticReplace.Replace, [rfReplaceAll])
-      else
-        CSS := CSS.Replace(StaticReplace.Search, StaticReplace.Replace, []);
+      Css := Css.Replace(StaticReplace.Search, StaticReplace.Replace, StaticReplace.ReplaceFlags);
 
-    ASARCSS.Contents.Clear;
+    AsarCss.Contents.Clear;
+    AsarCss.Contents.Write(Css[1], Length(Css));
 
-    ASARCSS.Contents.Write(CSS[1], Length(CSS));
+    AsarSvgJs.Contents.Clear;
+    AsarSvgJs.Contents.Write(SvgJs[1], Length(SvgJs));
 
-    ASAR.Write(TFunctions.GetPatchedResourceFilePath(FileName));
+    Asar.Write(TFunctions.GetPatchedResourceFilePath(FileName));
   finally
-    ASAR.Free;
+    Asar.Free;
   end;
 end;
 
@@ -184,7 +192,7 @@ begin
       Exit(True);
 end;
 
-class function TResourcePatcher.GetColor(const ResourcePatchCollection: TResourcePatchCollection; const ColorAdjustment: TColorAdjustment): TColor;
+class function TResourcePatcher.GetColor(const ResourcePatchCollection: TResourcePatchCollection; const ColorAdjustment: TResourcePatchColorAdjustment): TColor;
 begin
   case ResourcePatchCollection.Action of
     rpaNone:

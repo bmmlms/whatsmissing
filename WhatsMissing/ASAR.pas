@@ -6,6 +6,7 @@ uses
   Classes,
   fpjson,
   Generics.Collections,
+  StrUtils,
   SysUtils;
 
 type
@@ -148,7 +149,7 @@ begin
     Idx := 0;
     while Idx < SearchList.Count do
     begin
-      if (SearchList[Idx].Name = Name) and (SearchList[Idx].ClassType = T) then
+      if IsWild(SearchList[Idx].Name, Name, True) and (SearchList[Idx].ClassType = T) then
         Exit(SearchList[Idx]);
 
       if (SearchList[Idx].ClassType = TASARDir) then

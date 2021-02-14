@@ -13,47 +13,36 @@ uses
 {$I ImmersiveType.inc}
 
 type
-  TColorAdjustment = (caDarken5 = -25, caDarken3 = -15, caDarken2 = -10, caDarken = -5, caNone = 0, caLighten = 5, caLighten2 = 10, caLighten3 = 15, caLighten5 = 25);
-  TResourcePatchAction = (rpaNone, rpaImmersive, rpaCustom);
+  TResourcePatchColorAdjustment = (caNone = 0, caDarken5 = -25, caDarken3 = -15, caDarken2 = -10, caDarken = -5, caLighten = 5, caLighten2 = 10, caLighten3 = 15, caLighten5 = 25);
+  TResourcePatchTarget = (rptCss, rptJs);
 
-  TResourcePatchBase = class
-    abstract
-  private
-    FColorAdjustment: TColorAdjustment;
-  protected
-    constructor Create(const ColorAdjustment: TColorAdjustment);
-  public
-    function Execute(const Source: string; const Color: TColor): string; virtual; abstract;
-
-    property ColorAdjustment: TColorAdjustment read FColorAdjustment;
-  end;
-
-  TResourcePatchColor = class(TResourcePatchBase)
-  private
-    FSearchColor: TColor;
-  public
-    constructor Create(const SearchColor: TColor; const ColorAdjustment: TColorAdjustment = caNone); reintroduce;
-
-    function Execute(const Source: string; const Color: TColor): string; override;
-
-    property SearchColor: TColor read FSearchColor;
-  end;
-
-  TResourcePatchText = class(TResourcePatchBase)
+  TResourcePatch = class
   private
     FSearchText: string;
     FReplaceText: string;
-    FUseRGBNotation: Boolean;
+    FRGBNotation: Boolean;
+    FColorAdjustment: TResourcePatchColorAdjustment;
+    FTarget: TResourcePatchTarget;
+    FReplaceFlags: TReplaceFlags;
   public
-    constructor Create(const SearchText, ReplaceText: string; const UseRGBNotation: Boolean; const ColorAdjustment: TColorAdjustment = caNone); reintroduce;
+    constructor Create(const SearchColor: string); overload;
+    constructor Create(const SearchText, ReplaceText: string); overload;
 
-    function Execute(const Source: string; const Color: TColor): string; override;
+    function RBG: TResourcePatch;
+    function Darken: TResourcePatch;
+    function Darken3: TResourcePatch;
+    function Darken5: TResourcePatch;
+    function JS: TResourcePatch;
 
-    property SearchText: string read FSearchText;
-    property ReplaceText: string read FReplaceText;
+    function Execute(const Source: string; const Color: TColor): string;
+
+    property ColorAdjustment: TResourcePatchColorAdjustment read FColorAdjustment;
+    property Target: TResourcePatchTarget read FTarget;
   end;
 
-  TResourcePatchArray = array of TResourcePatchBase;
+  TResourcePatchArray = array of TResourcePatch;
+
+  TResourcePatchAction = (rpaNone, rpaImmersive, rpaCustom);
 
   TResourcePatchCollection = class
   private
@@ -242,48 +231,48 @@ begin
   FResourcePatches.Clear;
 
   // --teal-lighter
-  FResourcePatches.Add(TResourcePatchCollection.Create(1, 'Titlebar', clDefault, ImmersiveSystemAccent, rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('00bfa5'))]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(1, 'Titlebar', clDefault, ImmersiveSystemAccent, rpaImmersive, [TResourcePatch.Create('00bfa5')]));
 
   // --badge-pending, --teal, --active-tab-marker, --app-background-stripe, --checkbox-background, --highlight, --panel-background-colored-deeper
-  FResourcePatches.Add(TResourcePatchCollection.Create(10, 'Panel background', clDefault, ImmersiveSaturatedBackground, rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('009688'))]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(10, 'Panel background', clDefault, ImmersiveSaturatedBackground, rpaImmersive, [TResourcePatch.Create('009688')]));
 
   // --intro-border
-  FResourcePatches.Add(TResourcePatchCollection.Create(2, 'Intro border', clDefault, ImmersiveLightBorder, rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('4adf83'))]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(2, 'Intro border', clDefault, ImmersiveLightBorder, rpaImmersive, [TResourcePatch.Create('4adf83')]));
 
   // --progress-primary
-  FResourcePatches.Add(TResourcePatchCollection.Create(3, 'Progressbar', clDefault, ImmersiveControlLightProgressForeground, rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('00d9bb'))]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(3, 'Progressbar', clDefault, ImmersiveControlLightProgressForeground, rpaImmersive, [TResourcePatch.Create('00d9bb')]));
 
   // --unread-marker-background
-  FResourcePatches.Add(TResourcePatchCollection.Create(4, 'Unread message badge', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('06d755'))]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(4, 'Unread message badge', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatch.Create('06d755')]));
 
   // --ptt-green
-  FResourcePatches.Add(TResourcePatchCollection.Create(11, 'New voice mail icon', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('09d261'))]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(11, 'New voice mail icon', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatch.Create('09d261'), TResourcePatch.Create('09D261').JS]));
 
   // --ptt-blue, --icon-ack
-  FResourcePatches.Add(TResourcePatchCollection.Create(12, 'Heard voice mail icon', clDefault, ImmersiveLightWUWarning, rpaImmersive, [TResourcePatchColor.Create(TFunctions.HTMLToColor('4fc3f7'))]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(12, 'Heard voice mail icon', clDefault, ImmersiveLightWUWarning, rpaImmersive, [TResourcePatch.Create('4fc3f7')]));
 
   FResourcePatches.Add(TResourcePatchCollection.Create(8, 'Background of incoming messages', clDefault, ImmersiveLightChromeMedium, rpaImmersive,
-    [TResourcePatchText.Create('--incoming-background:#fff;', '--incoming-background:#%COLOR%;', False), TResourcePatchText.Create('--incoming-background-rgb:255,255,255;',
-    '--incoming-background-rgb:%COLOR%;', True), TResourcePatchText.Create('--incoming-background-deeper:#f0f0f0;', '--incoming-background-deeper:#%COLOR%;', False, caDarken),
-    TResourcePatchText.Create('--incoming-background-deeper-rgb:240,240,240;', '--incoming-background-deeper-rgb:%COLOR%;', True, caDarken), TResourcePatchText.Create(
-    '--audio-track-incoming:#e6e6e6;', '--audio-track-incoming:#%COLOR%;', False, caDarken3), TResourcePatchText.Create('--audio-progress-incoming:#31c76a;', '--audio-progress-incoming:#%COLOR%;', False, caDarken5),
-    TResourcePatchText.Create('--audio-progress-played-incoming:#30b6f6;', '--audio-progress-played-incoming:#%COLOR%;', False, caDarken5)]));
+    [TResourcePatch.Create('--incoming-background:#fff;', '--incoming-background:#%COLOR%;'), TResourcePatch.Create('--incoming-background-rgb:255,255,255;', '--incoming-background-rgb:%COLOR%;').RBG,
+    TResourcePatch.Create('--incoming-background-deeper:#f0f0f0;', '--incoming-background-deeper:#%COLOR%;').Darken, TResourcePatch.Create('--incoming-background-deeper-rgb:240,240,240;',
+    '--incoming-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourcePatch.Create('--audio-track-incoming:#e6e6e6;', '--audio-track-incoming:#%COLOR%;').Darken3,
+    TResourcePatch.Create('--audio-progress-incoming:#31c76a;', '--audio-progress-incoming:#%COLOR%;').Darken5, TResourcePatch.Create('--audio-progress-played-incoming:#30b6f6;',
+    '--audio-progress-played-incoming:#%COLOR%;').Darken5]));
 
   FResourcePatches.Add(TResourcePatchCollection.Create(9, 'Background of outgoing messages', clDefault, ImmersiveLightChromeWhite, rpaImmersive,
-    [TResourcePatchText.Create('--outgoing-background:#dcf8c6;', '--outgoing-background:#%COLOR%;', False), TResourcePatchText.Create('--outgoing-background-rgb:220,248,198;',
-    '--outgoing-background-rgb:%COLOR%;', True), TResourcePatchText.Create('--outgoing-background-deeper:#cfe9ba;', '--outgoing-background-deeper:#%COLOR%;', False, caDarken),
-    TResourcePatchText.Create('--outgoing-background-deeper-rgb:207,233,186;', '--outgoing-background-deeper-rgb:%COLOR%;', True, caDarken), TResourcePatchText.Create(
-    '--audio-track-outgoing:#c6dfb2;', '--audio-track-outgoing:#%COLOR%;', False, caDarken3), TResourcePatchText.Create('--audio-progress-outgoing:#889a7b;', '--audio-progress-outgoing:#%COLOR%;', False, caDarken5),
-    TResourcePatchText.Create('--audio-progress-played-outgoing:#2ab5eb;', '--audio-progress-played-outgoing:#%COLOR%;', False, caDarken5)]));
+    [TResourcePatch.Create('--outgoing-background:#dcf8c6;', '--outgoing-background:#%COLOR%;'), TResourcePatch.Create('--outgoing-background-rgb:220,248,198;', '--outgoing-background-rgb:%COLOR%;').RBG,
+    TResourcePatch.Create('--outgoing-background-deeper:#cfe9ba;', '--outgoing-background-deeper:#%COLOR%;').Darken, TResourcePatch.Create('--outgoing-background-deeper-rgb:207,233,186;',
+    '--outgoing-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourcePatch.Create('--audio-track-outgoing:#c6dfb2;', '--audio-track-outgoing:#%COLOR%;').Darken3,
+    TResourcePatch.Create('--audio-progress-outgoing:#889a7b;', '--audio-progress-outgoing:#%COLOR%;').Darken5, TResourcePatch.Create('--audio-progress-played-outgoing:#2ab5eb;',
+    '--audio-progress-played-outgoing:#%COLOR%;').Darken5]));
 
   FResourcePatches.Add(TResourcePatchCollection.Create(5, 'Minimize button hover color', clDefault, ImmersiveControlDefaultLightButtonBackgroundHover, rpaImmersive,
-    [TResourcePatchText.Create('#windows-title-minimize:hover{background-color:var(--teal-hover)}', '#windows-title-minimize:hover{background-color:#%COLOR%}', False)]));
+    [TResourcePatch.Create('#windows-title-minimize:hover{background-color:var(--teal-hover)}', '#windows-title-minimize:hover{background-color:#%COLOR%}')]));
 
   FResourcePatches.Add(TResourcePatchCollection.Create(6, 'Maximize button hover color', clDefault, ImmersiveControlDefaultLightButtonBackgroundHover, rpaImmersive,
-    [TResourcePatchText.Create('#windows-title-maximize:hover{background-color:var(--teal-hover)}', '#windows-title-maximize:hover{background-color:#%COLOR%}', False)]));
+    [TResourcePatch.Create('#windows-title-maximize:hover{background-color:var(--teal-hover)}', '#windows-title-maximize:hover{background-color:#%COLOR%}')]));
 
   FResourcePatches.Add(TResourcePatchCollection.Create(7, 'Close button hover color', clDefault, ImmersiveHardwareTitleBarCloseButtonHover, rpaImmersive,
-    [TResourcePatchText.Create('#windows-title-close:hover{background-color:var(--teal-hover)}', '#windows-title-close:hover{background-color:#%COLOR%}', False)]));
+    [TResourcePatch.Create('#windows-title-close:hover{background-color:var(--teal-hover)}', '#windows-title-close:hover{background-color:#%COLOR%}')]));
 
   FShowNotificationIcon := True;
   FIndicateNewMessages := True;
@@ -291,41 +280,54 @@ begin
   FAlwaysOnTop := False;
 end;
 
-{ TResourcePatchBase }
+{ TResourcePatch }
 
-constructor TResourcePatchBase.Create(const ColorAdjustment: TColorAdjustment);
+constructor TResourcePatch.Create(const SearchColor: string);
 begin
-  FColorAdjustment := ColorAdjustment;
+  FSearchText := SearchColor;
+  FReplaceText := '%COLOR%';
+  FReplaceFlags := [rfReplaceAll];
 end;
 
-{ TResourcePatchColor }
-
-constructor TResourcePatchColor.Create(const SearchColor: TColor; const ColorAdjustment: TColorAdjustment);
+constructor TResourcePatch.Create(const SearchText, ReplaceText: string);
 begin
-  inherited Create(ColorAdjustment);
-
-  FSearchColor := SearchColor;
-end;
-
-function TResourcePatchColor.Execute(const Source: string; const Color: TColor): string;
-begin
-  Result := Source.Replace(TFunctions.ColorToHTML(SearchColor).ToLower, TFunctions.ColorToHTML(Color), [rfReplaceAll]);
-end;
-
-{ TResourcePatchText }
-
-constructor TResourcePatchText.Create(const SearchText, ReplaceText: string; const UseRGBNotation: Boolean; const ColorAdjustment: TColorAdjustment);
-begin
-  inherited Create(ColorAdjustment);
-
   FSearchText := SearchText;
   FReplaceText := ReplaceText;
-  FUseRGBNotation := UseRGBNotation;
 end;
 
-function TResourcePatchText.Execute(const Source: string; const Color: TColor): string;
+function TResourcePatch.RBG: TResourcePatch;
 begin
-  Result := Source.Replace(SearchText, ReplaceText.Replace('%COLOR%', IfThen<string>(FUseRGBNotation, TFunctions.ColorToRGBHTML(Color), TFunctions.ColorToHTML(Color).ToLower), []), []);
+  Result := Self;
+  FRGBNotation := True;
+end;
+
+function TResourcePatch.Darken: TResourcePatch;
+begin
+  Result := Self;
+  FColorAdjustment := caDarken;
+end;
+
+function TResourcePatch.Darken3: TResourcePatch;
+begin
+  Result := Self;
+  FColorAdjustment := caDarken3;
+end;
+
+function TResourcePatch.Darken5: TResourcePatch;
+begin
+  Result := Self;
+  FColorAdjustment := caDarken5;
+end;
+
+function TResourcePatch.JS: TResourcePatch;
+begin
+  Result := Self;
+  FTarget := rptJs;
+end;
+
+function TResourcePatch.Execute(const Source: string; const Color: TColor): string;
+begin
+  Result := Source.Replace(FSearchText, FReplaceText.Replace('%COLOR%', IfThen<string>(FRGBNotation, TFunctions.ColorToRGBHTML(Color), TFunctions.ColorToHTML(Color)), []), FReplaceFlags);
 end;
 
 { TResourcePatchCollection }
@@ -342,7 +344,7 @@ end;
 
 destructor TResourcePatchCollection.Destroy;
 var
-  ResourcePatch: TResourcePatchBase;
+  ResourcePatch: TResourcePatch;
 begin
   for ResourcePatch in Patches do
     ResourcePatch.Free;

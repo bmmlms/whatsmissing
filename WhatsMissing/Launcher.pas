@@ -317,7 +317,7 @@ begin
 
     FLog.Info('Cleanup finished, searching for unpatched');
 
-    if RP.ExistsUnpatched or FSettings.RebuildResources then
+    if FSettings.RebuildResources or RP.ExistsUnpatched then
       SendMessage(FHandle, WM_CHECK_RESOURCES_ASYNC_PROGRESS, WCRAP_FILES_FOUND, 0);
 
     FLog.Info('Done, now rebuilding');
