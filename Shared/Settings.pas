@@ -13,7 +13,7 @@ uses
 {$I ImmersiveType.inc}
 
 type
-  TResourcePatchColorAdjustment = (caNone = 0, caDarken5 = -25, caDarken3 = -15, caDarken2 = -10, caDarken = -5, caLighten = 5, caLighten2 = 10, caLighten3 = 15, caLighten5 = 25);
+  TResourcePatchColorAdjustment = (caDarken5 = -25, caDarken3 = -15, caDarken2 = -10, caDarken = -5, caNone = 0, caLighten = 5, caLighten2 = 10, caLighten3 = 15, caLighten5 = 25);
   TResourcePatchTarget = (rptCss, rptJs);
 
   TResourcePatch = class
@@ -140,12 +140,12 @@ begin
     try
       JSONObject := TJSONObject(GetJSON(FS));
       try
-        FRebuildResources := JSONObject.Get('RebuildResources', False);
-        FShowNotificationIcon := JSONObject.Get('ShowNotificationIcon', True);
-        FIndicateNewMessages := JSONObject.Get('IndicateNewMessages', False);
-        FIndicatorColor := JSONObject.Get('IndicatorColor');
-        FHideMaximize := JSONObject.Get('HideMaximize', False);
-        FAlwaysOnTop := JSONObject.Get('AlwaysOnTop', False);
+        FRebuildResources := JSONObject.Get('RebuildResources', FRebuildResources);
+        FShowNotificationIcon := JSONObject.Get('ShowNotificationIcon', FShowNotificationIcon);
+        FIndicateNewMessages := JSONObject.Get('IndicateNewMessages', FIndicateNewMessages);
+        FIndicatorColor := JSONObject.Get('IndicatorColor', FIndicatorColor);
+        FHideMaximize := JSONObject.Get('HideMaximize', FHideMaximize);
+        FAlwaysOnTop := JSONObject.Get('AlwaysOnTop', FAlwaysOnTop);
 
         JSONArray := JSONObject.Get('ResourcePatches', TJSONArray(nil));
 
@@ -224,8 +224,6 @@ const
 var
   ResourcePatchCollection: TResourcePatchCollection;
 begin
-  FRebuildResources := False;
-
   for ResourcePatchCollection in FResourcePatches do
     ResourcePatchCollection.Free;
   FResourcePatches.Clear;
@@ -243,27 +241,25 @@ begin
   FResourcePatches.Add(TResourcePatchCollection.Create(3, 'Progressbar', clDefault, ImmersiveControlLightProgressForeground, rpaImmersive, [TResourcePatch.Create('00d9bb')]));
 
   // --unread-marker-background
-  FResourcePatches.Add(TResourcePatchCollection.Create(4, 'Unread message badge', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatch.Create('06d755')]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(4, 'Unread message badge', clDefault, ImmersiveLightWUWarning, rpaImmersive, [TResourcePatch.Create('06d755')]));
 
   // --ptt-green
-  FResourcePatches.Add(TResourcePatchCollection.Create(11, 'New voice mail icon', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatch.Create('09d261'), TResourcePatch.Create('09D261').JS]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(11, 'New voice mail icon', clDefault, ImmersiveLightWUWarning, rpaImmersive, [TResourcePatch.Create('09d261'), TResourcePatch.Create('09D261').JS]));
 
   // --ptt-blue, --icon-ack
-  FResourcePatches.Add(TResourcePatchCollection.Create(12, 'Heard voice mail icon', clDefault, ImmersiveLightWUWarning, rpaImmersive, [TResourcePatch.Create('4fc3f7')]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(12, 'Heard voice mail icon', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatch.Create('4fc3f7')]));
 
   FResourcePatches.Add(TResourcePatchCollection.Create(8, 'Background of incoming messages', clDefault, ImmersiveLightChromeMedium, rpaImmersive,
     [TResourcePatch.Create('--incoming-background:#fff;', '--incoming-background:#%COLOR%;'), TResourcePatch.Create('--incoming-background-rgb:255,255,255;', '--incoming-background-rgb:%COLOR%;').RBG,
     TResourcePatch.Create('--incoming-background-deeper:#f0f0f0;', '--incoming-background-deeper:#%COLOR%;').Darken, TResourcePatch.Create('--incoming-background-deeper-rgb:240,240,240;',
     '--incoming-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourcePatch.Create('--audio-track-incoming:#e6e6e6;', '--audio-track-incoming:#%COLOR%;').Darken3,
-    TResourcePatch.Create('--audio-progress-incoming:#31c76a;', '--audio-progress-incoming:#%COLOR%;').Darken5, TResourcePatch.Create('--audio-progress-played-incoming:#30b6f6;',
-    '--audio-progress-played-incoming:#%COLOR%;').Darken5]));
+    TResourcePatch.Create('--audio-progress-incoming:#31c76a;', '--audio-progress-incoming:#%COLOR%;').Darken5, TResourcePatch.Create('--audio-progress-played-incoming:#30b6f6;', '--audio-progress-played-incoming:#%COLOR%;').Darken5]));
 
   FResourcePatches.Add(TResourcePatchCollection.Create(9, 'Background of outgoing messages', clDefault, ImmersiveLightChromeWhite, rpaImmersive,
     [TResourcePatch.Create('--outgoing-background:#dcf8c6;', '--outgoing-background:#%COLOR%;'), TResourcePatch.Create('--outgoing-background-rgb:220,248,198;', '--outgoing-background-rgb:%COLOR%;').RBG,
     TResourcePatch.Create('--outgoing-background-deeper:#cfe9ba;', '--outgoing-background-deeper:#%COLOR%;').Darken, TResourcePatch.Create('--outgoing-background-deeper-rgb:207,233,186;',
     '--outgoing-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourcePatch.Create('--audio-track-outgoing:#c6dfb2;', '--audio-track-outgoing:#%COLOR%;').Darken3,
-    TResourcePatch.Create('--audio-progress-outgoing:#889a7b;', '--audio-progress-outgoing:#%COLOR%;').Darken5, TResourcePatch.Create('--audio-progress-played-outgoing:#2ab5eb;',
-    '--audio-progress-played-outgoing:#%COLOR%;').Darken5]));
+    TResourcePatch.Create('--audio-progress-outgoing:#889a7b;', '--audio-progress-outgoing:#%COLOR%;').Darken5, TResourcePatch.Create('--audio-progress-played-outgoing:#2ab5eb;', '--audio-progress-played-outgoing:#%COLOR%;').Darken5]));
 
   FResourcePatches.Add(TResourcePatchCollection.Create(5, 'Minimize button hover color', clDefault, ImmersiveControlDefaultLightButtonBackgroundHover, rpaImmersive,
     [TResourcePatch.Create('#windows-title-minimize:hover{background-color:var(--teal-hover)}', '#windows-title-minimize:hover{background-color:#%COLOR%}')]));
@@ -274,9 +270,11 @@ begin
   FResourcePatches.Add(TResourcePatchCollection.Create(7, 'Close button hover color', clDefault, ImmersiveHardwareTitleBarCloseButtonHover, rpaImmersive,
     [TResourcePatch.Create('#windows-title-close:hover{background-color:var(--teal-hover)}', '#windows-title-close:hover{background-color:#%COLOR%}')]));
 
+  FRebuildResources := False;
   FShowNotificationIcon := True;
   FIndicateNewMessages := True;
-  FIndicatorColor := TFunctions.HTMLToColor('c4314b');
+  FIndicatorColor := TFunctions.HTMLToColor('fe9500');
+  FHideMaximize := False;
   FAlwaysOnTop := False;
 end;
 
@@ -287,12 +285,14 @@ begin
   FSearchText := SearchColor;
   FReplaceText := '%COLOR%';
   FReplaceFlags := [rfReplaceAll];
+  FColorAdjustment := caNone;
 end;
 
 constructor TResourcePatch.Create(const SearchText, ReplaceText: string);
 begin
   FSearchText := SearchText;
   FReplaceText := ReplaceText;
+  FColorAdjustment := caNone;
 end;
 
 function TResourcePatch.RBG: TResourcePatch;
