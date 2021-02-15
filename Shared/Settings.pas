@@ -247,7 +247,7 @@ begin
   FResourcePatches.Add(TResourcePatchCollection.Create(11, 'New voice mail icon', clDefault, ImmersiveLightWUWarning, rpaImmersive, [TResourcePatch.Create('09d261'), TResourcePatch.Create('09D261').JS]));
 
   // --ptt-blue, --icon-ack
-  FResourcePatches.Add(TResourcePatchCollection.Create(12, 'Heard voice mail icon', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatch.Create('4fc3f7')]));
+  FResourcePatches.Add(TResourcePatchCollection.Create(12, 'Acknowledged icons', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatch.Create('4fc3f7')]));
 
   FResourcePatches.Add(TResourcePatchCollection.Create(8, 'Background of incoming messages', clDefault, ImmersiveLightChromeMedium, rpaImmersive,
     [TResourcePatch.Create('--incoming-background:#fff;', '--incoming-background:#%COLOR%;'), TResourcePatch.Create('--incoming-background-rgb:255,255,255;', '--incoming-background-rgb:%COLOR%;').RBG,
