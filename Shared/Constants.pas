@@ -51,7 +51,7 @@ const
   UNINSTALL_ARG = 'uninstall';
   UNINSTALL_PARENTHANDLE_ARG = 'parenthandle';
 
-  WNDPROC_PROPNAME: PWideChar = 'WhatsMissing_WndProp';
+  WNDPROC_PROPNAME: PWideChar = 'WhatsMissing_WndProc';
 
   UTF8_BOM: array[0..2] of Byte = ($EF, $BB, $BF);
 

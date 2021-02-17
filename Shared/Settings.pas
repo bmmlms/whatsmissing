@@ -32,6 +32,7 @@ type
     function Darken: TResourcePatch;
     function Darken3: TResourcePatch;
     function Darken5: TResourcePatch;
+    function Lighten3: TResourcePatch;
     function JS: TResourcePatch;
 
     function Execute(const Source: string; const Color: TColor): string;
@@ -249,6 +250,18 @@ begin
   // --ptt-blue, --icon-ack
   FResourcePatches.Add(TResourcePatchCollection.Create(12, 'Acknowledged icons', clDefault, ImmersiveLightWUNormal, rpaImmersive, [TResourcePatch.Create('4fc3f7')]));
 
+  // --typing
+  FResourcePatches.Add(TResourcePatchCollection.Create(13, '"Typing..." notification', clDefault, ImmersiveStartDisabledText, rpaImmersive, [TResourcePatch.Create('07bc4c')]));
+
+  FResourcePatches.Add(TResourcePatchCollection.Create(14, 'Primary button background', clDefault, ImmersiveControlDefaultLightButtonBackgroundRest, rpaImmersive,
+    [TResourcePatch.Create('--button-primary-background:#05cd51;', '--button-primary-background:#%COLOR%;'), TResourcePatch.Create('--button-primary-background-hover:#06d253;', '--button-primary-background-hover:#%COLOR%;').Darken3]));
+
+  FResourcePatches.Add(TResourcePatchCollection.Create(15, 'Secondary button background', clDefault, ImmersiveControlLightButtonBackgroundRest, rpaImmersive,
+    [TResourcePatch.Create('--button-secondary-background:#fff;', '--button-secondary-background:#%COLOR%;'), TResourcePatch.Create('--button-secondary-background-hover:#fff;', '--button-secondary-background-hover:#%COLOR%;').Darken3]));
+
+  FResourcePatches.Add(TResourcePatchCollection.Create(16, 'Secondary button text', clDefault, ImmersiveControlLightAppButtonTextRest, rpaImmersive,
+    [TResourcePatch.Create('--button-secondary:#07bc4c;', '--button-secondary:#%COLOR%;'), TResourcePatch.Create('--button-secondary-hover:#05cd51;', '--button-secondary-hover:#%COLOR%;').Lighten3]));
+
   FResourcePatches.Add(TResourcePatchCollection.Create(8, 'Background of incoming messages', clDefault, ImmersiveLightChromeMedium, rpaImmersive,
     [TResourcePatch.Create('--incoming-background:#fff;', '--incoming-background:#%COLOR%;'), TResourcePatch.Create('--incoming-background-rgb:255,255,255;', '--incoming-background-rgb:%COLOR%;').RBG,
     TResourcePatch.Create('--incoming-background-deeper:#f0f0f0;', '--incoming-background-deeper:#%COLOR%;').Darken, TResourcePatch.Create('--incoming-background-deeper-rgb:240,240,240;',
@@ -317,6 +330,12 @@ function TResourcePatch.Darken5: TResourcePatch;
 begin
   Result := Self;
   FColorAdjustment := caDarken5;
+end;
+
+function TResourcePatch.Lighten3: TResourcePatch;
+begin
+  Result := Self;
+  FColorAdjustment := caLighten3;
 end;
 
 function TResourcePatch.JS: TResourcePatch;

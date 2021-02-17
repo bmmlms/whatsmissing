@@ -501,7 +501,6 @@ var
       end;
     end;
   end;
-
 begin
   MMFLauncher := TMMFLauncher.Create;
   MMFSettings := TMMFSettings.Create;
