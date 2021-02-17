@@ -229,6 +229,7 @@ end;
 
 function TMMFStream.Realloc(var NewCapacity: PtrInt): Pointer;
 begin
+  Result := nil;
 end;
 
 { TDataLauncher }
