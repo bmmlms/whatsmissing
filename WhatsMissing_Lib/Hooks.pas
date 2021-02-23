@@ -24,6 +24,8 @@ type
   TGetFileAttributesW = function(lpFileName: LPCWSTR): DWORD; stdcall;
   TRoGetActivationFactory = function(activatableClassId: HSTRING; const iid: TGUID; out outfactory: Pointer): HRESULT; stdcall;
 
+  { THooks }
+
   THooks = class
   private
     class var
@@ -90,7 +92,6 @@ class function THooks.HCreateProcessInternalW(hToken: HANDLE; lpApplicationName:
 var
   LastError: Cardinal;
   ApplicationName: string;
-  CommandLineUnicode: UnicodeString;
 begin
   ApplicationName := lpApplicationName;
   ApplicationName := ApplicationName.Trim;
@@ -98,10 +99,8 @@ begin
   if ApplicationName.ToLower.Equals(FMMFLauncher.WhatsMissingExe32.ToLower) or ApplicationName.ToLower.Equals(FMMFLauncher.WhatsMissingExe64.ToLower) then
     Exit(OCreateProcessInternalW(hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation, hNewToken));
 
-  CommandLineUnicode := Format('%s -%s %d', [lpCommandLine, MMFHANDLE_ARG, FMMFLauncher.Handle]);
-
-  Result := OCreateProcessInternalW(hToken, lpApplicationName, PWideChar(CommandLineUnicode), lpProcessAttributes, lpThreadAttributes, True, dwCreationFlags or CREATE_SUSPENDED,
-    lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation, hNewToken);
+  Result := OCreateProcessInternalW(hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags or CREATE_SUSPENDED, lpEnvironment,
+    lpCurrentDirectory, lpStartupInfo, lpProcessInformation, hNewToken);
 
   LastError := GetLastError;
 
@@ -119,7 +118,7 @@ begin
   SetLastError(LastError);
 end;
 
-class function THooks.HRegisterClassExW(WndClass: PWndClassExW): ATOM;
+class function THooks.HRegisterClassExW(WndClass: PWndClassExW): ATOM; stdcall;
 var
   LastError: Cardinal;
 begin
@@ -136,7 +135,7 @@ begin
   SetLastError(LastError);
 end;
 
-class function THooks.HCreateWindowExW(dwExStyle: DWORD; lpClassName, lpWindowName: LPCWSTR; dwStyle: DWORD; X, Y, nWidth, nHeight: Integer; hWndParent: HWND; hMenu: HMENU; hInstance: HINST; lpParam: LPVOID): HWND;
+class function THooks.HCreateWindowExW(dwExStyle: DWORD; lpClassName, lpWindowName: LPCWSTR; dwStyle: DWORD; X, Y, nWidth, nHeight: Integer; hWndParent: HWND; hMenu: HMENU; hInstance: HINST; lpParam: LPVOID): HWND; stdcall;
 var
   LastError: Cardinal;
 begin
@@ -159,7 +158,7 @@ begin
   SetLastError(LastError);
 end;
 
-class function THooks.HCreateFileW(lpFileName: LPCWSTR; dwDesiredAccess, dwShareMode: DWORD; lpSecurityAttributes: PSecurityAttributes; dwCreationDisposition, dwFlagsAndAttributes: DWORD; hTemplateFile: THandle): THandle;
+class function THooks.HCreateFileW(lpFileName: LPCWSTR; dwDesiredAccess, dwShareMode: DWORD; lpSecurityAttributes: PSecurityAttributes; dwCreationDisposition, dwFlagsAndAttributes: DWORD; hTemplateFile: THandle): THandle; stdcall;
 var
   FileName, PatchedFileName: string;
   PatchedFileNameUnicode: UnicodeString;
@@ -180,7 +179,7 @@ begin
   Result := OCreateFileW(PWideChar(PatchedFileNameUnicode), dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 end;
 
-class function THooks.HWriteFile(hFile: THandle; Buffer: Pointer; nNumberOfBytesToWrite: DWORD; lpNumberOfBytesWritten: PDWORD; lpOverlapped: POverlapped): BOOL;
+class function THooks.HWriteFile(hFile: THandle; Buffer: Pointer; nNumberOfBytesToWrite: DWORD; lpNumberOfBytesWritten: PDWORD; lpOverlapped: POverlapped): BOOL; stdcall;
 const
   MessageRead: PWideChar = 'action,cmd,read,';
 var
@@ -206,7 +205,7 @@ begin
   Result := OWriteFile(hFile, Buffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);
 end;
 
-class function THooks.HGetFileAttributesW(lpFileName: LPCWSTR): DWORD;
+class function THooks.HGetFileAttributesW(lpFileName: LPCWSTR): DWORD; stdcall;
 var
   PatchedFileName: string;
   PatchedFileNameUnicode: UnicodeString;
@@ -226,7 +225,7 @@ begin
   Result := OGetFileAttributesW(PWideChar(PatchedFileNameUnicode));
 end;
 
-class function THooks.HRoGetActivationFactory(activatableClassId: HSTRING; const iid: TGUID; out outfactory: Pointer): HRESULT;
+class function THooks.HRoGetActivationFactory(activatableClassId: HSTRING; const iid: TGUID; out outfactory: Pointer): HRESULT; stdcall;
 begin
   if iid.ToString = '{04124B20-82C6-4229-B109-FD9ED4662B53}' then
   begin

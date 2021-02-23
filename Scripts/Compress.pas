@@ -1,7 +1,9 @@
 {$mode objfpc}{$H+}
 
 uses
-  Classes, SysUtils, paszlib;
+  Classes,
+  SysUtils,
+  paszlib;
 
 function CompressStream(InStream: TStream; OutStream: TStream): Integer;
 const

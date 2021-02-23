@@ -41,9 +41,9 @@ type
 
   TMMFLauncher = class(TMMF)
   private
-    FLogFileHandle: UInt64;
     FLauncherPid, FWhatsAppGuiPid: Cardinal;
-    FLauncherHandle, FLauncherWindowHandle, FWhatsAppWindowHandle: UInt64;
+    FLauncherWindowHandle, FWhatsAppWindowHandle: UInt64;
+    FLogFileName: string;
     FWhatsMissingExe32, FWhatsMissingLib32: string;
     FWhatsMissingExe64, FWhatsMissingLib64: string;
   protected
@@ -52,12 +52,11 @@ type
   public
     constructor Create(const Handle: THandle = 0);
 
-    property LogFileHandle: UInt64 read FLogFileHandle write FLogFileHandle;
     property LauncherPid: Cardinal read FLauncherPid write FLauncherPid;
-    property LauncherHandle: UInt64 read FLauncherHandle write FLauncherHandle;
     property LauncherWindowHandle: UInt64 read FLauncherWindowHandle write FLauncherWindowHandle;
     property WhatsAppGuiPid: Cardinal read FWhatsAppGuiPid write FWhatsAppGuiPid;
     property WhatsAppWindowHandle: UInt64 read FWhatsAppWindowHandle write FWhatsAppWindowHandle;
+    property LogFileName: string read FLogFileName write FLogFileName;
     property WhatsMissingExe32: string read FWhatsMissingExe32 write FWhatsMissingExe32;
     property WhatsMissingLib32: string read FWhatsMissingLib32 write FWhatsMissingLib32;
     property WhatsMissingExe64: string read FWhatsMissingExe64 write FWhatsMissingExe64;
@@ -99,6 +98,8 @@ begin
   Result := OpenFileMappingW(dwDesiredAccess, bInheritHandle, IfThen<PWideChar>(Name = '', nil, PWideChar(Name)));
 end;
 
+{ TMMF }
+
 class function TMMF.Exists(const Name: string): Boolean;
 var
   Handle: THandle;
@@ -139,7 +140,7 @@ begin
     raise Exception.Create('Error setting security descriptor dacl');
   PSA.nLength := SizeOf(TSecurityAttributes);
   PSA.lpSecurityDescriptor := PSD;
-  PSA.bInheritHandle := True;
+  PSA.bInheritHandle := False;
 end;
 
 procedure TMMF.Read;
@@ -232,7 +233,7 @@ begin
   Result := nil;
 end;
 
-{ TDataLauncher }
+{ TMMFLauncher }
 
 constructor TMMFLauncher.Create(const Handle: THandle);
 begin
@@ -243,12 +244,14 @@ procedure TMMFLauncher.ReadStream(const MS: TMemoryStream);
 var
   StrLength: UInt16;
 begin
-  MS.ReadBuffer(FLogFileHandle, SizeOf(FLogFileHandle));
   MS.ReadBuffer(FLauncherPid, SizeOf(FLauncherPid));
-  MS.ReadBuffer(FLauncherHandle, SizeOf(FLauncherHandle));
   MS.ReadBuffer(FLauncherWindowHandle, SizeOf(FLauncherWindowHandle));
   MS.ReadBuffer(FWhatsAppGuiPid, SizeOf(FWhatsAppGuiPid));
   MS.ReadBuffer(FWhatsAppWindowHandle, SizeOf(FWhatsAppWindowHandle));
+
+  MS.ReadBuffer(StrLength, SizeOf(UInt16));
+  SetLength(FLogFileName, StrLength);
+  MS.ReadBuffer(FLogFileName[1], StrLength);
 
   MS.ReadBuffer(StrLength, SizeOf(UInt16));
   SetLength(FWhatsMissingExe32, StrLength);
@@ -271,12 +274,14 @@ procedure TMMFLauncher.WriteStream(const MS: TMemoryStream);
 var
   StrLength: UInt16;
 begin
-  MS.WriteBuffer(FLogFileHandle, SizeOf(FLogFileHandle));
   MS.WriteBuffer(FLauncherPid, SizeOf(FLauncherPid));
-  MS.WriteBuffer(FLauncherHandle, SizeOf(FLauncherHandle));
   MS.WriteBuffer(FLauncherWindowHandle, SizeOf(FLauncherWindowHandle));
   MS.WriteBuffer(FWhatsAppGuiPid, SizeOf(FWhatsAppGuiPid));
   MS.WriteBuffer(FWhatsAppWindowHandle, SizeOf(FWhatsAppWindowHandle));
+
+  StrLength := Length(FLogFileName);
+  MS.WriteBuffer(StrLength, SizeOf(UInt16));
+  MS.WriteBuffer(FLogFileName[1], StrLength);
 
   StrLength := Length(FWhatsMissingExe32);
   MS.WriteBuffer(StrLength, SizeOf(UInt16));
@@ -295,7 +300,7 @@ begin
   MS.WriteBuffer(FWhatsMissingLib64[1], StrLength);
 end;
 
-{ TDataSettings }
+{ TMMFSettings }
 
 constructor TMMFSettings.Create;
 begin

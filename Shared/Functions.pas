@@ -203,7 +203,7 @@ begin
     SetHandleInformation(ProcessHandle, HANDLE_FLAG_INHERIT, 1);
     SetHandleInformation(ThreadHandle, HANDLE_FLAG_INHERIT, 1);
 
-    Res := StartProcess(InjectorPath, Format('-%s -%s %d -%s %d -%s %d', [INJECT_ARG, MMFHANDLE_ARG, MMFLauncher.Handle, PROCESSHANDLE_ARG, ProcessHandle, THREADHANDLE_ARG, ThreadHandle]), True, False);
+    Res := StartProcess(InjectorPath, Format('-%s -%s %d -%s %d', [INJECT_ARG, PROCESSHANDLE_ARG, ProcessHandle, THREADHANDLE_ARG, ThreadHandle]), True, False);
     if not Res.Success then
       Exit;
 

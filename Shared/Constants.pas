@@ -44,7 +44,6 @@ const
 
   SETTINGS_ARG = 'settings';
   INJECT_ARG = 'inject';
-  MMFHANDLE_ARG = 'mmfhandle';
   PROCESSHANDLE_ARG = 'processhandle';
   THREADHANDLE_ARG = 'threadhandle';
   PREPARE_UNINSTALL_ARG = 'prepareuninstall';

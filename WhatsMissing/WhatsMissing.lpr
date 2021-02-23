@@ -22,27 +22,21 @@ uses
 procedure RunInject;
 var
   MMFLauncher: TMMFLauncher;
-  MMFHandle, ProcessHandle, ThreadHandle: THandle;
-  MMFHandleStr, ProcessHandleStr, ThreadHandleStr: string;
+  ProcessHandle, ThreadHandle: THandle;
+  ProcessHandleStr, ThreadHandleStr: string;
 begin
-  if TFunctions.FindCmdLineSwitch(MMFHANDLE_ARG, MMFHandleStr) and TFunctions.FindCmdLineSwitch(PROCESSHANDLE_ARG, ProcessHandleStr) and TFunctions.FindCmdLineSwitch(THREADHANDLE_ARG, ThreadHandleStr) then
-
+  if TFunctions.FindCmdLineSwitch(PROCESSHANDLE_ARG, ProcessHandleStr) and TFunctions.FindCmdLineSwitch(THREADHANDLE_ARG, ThreadHandleStr) then
   begin
-    MMFHandle := StrToInt(MMFHandleStr);
     ProcessHandle := StrToInt(ProcessHandleStr);
     ThreadHandle := StrToInt(ThreadHandleStr);
 
-    MMFLauncher := TMMFLauncher.Create(MMFHandle);
+    MMFLauncher := TMMFLauncher.Create;
     try
       MMFLauncher.Read;
 
       if not TFunctions.InjectLibrary(MMFLauncher, ProcessHandle, ThreadHandle) then
         raise Exception.Create('Error injecting library')
     finally
-      if MMFLauncher.LogFileHandle > 0 then
-        CloseHandle(MMFLauncher.LogFileHandle);
-
-      CloseHandle(MMFHandle);
       CloseHandle(ProcessHandle);
       CloseHandle(ThreadHandle);
 
@@ -72,6 +66,7 @@ begin
   end;
 
   Application.Initialize;
+  Application.CaptureExceptions := False;
   Application.Title := APP_NAME;
   Application.CreateForm(TfrmSettings, F);
   Application.Run;

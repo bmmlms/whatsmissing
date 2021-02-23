@@ -87,7 +87,7 @@ begin
 
   FSettings := TSettings.Create(TPaths.SettingsPath);
 
-  FMMFLauncher.LogFileHandle := FLog.Handle;
+  FMMFLauncher.LogFileName := FLog.FileName;
   FMMFLauncher.LauncherPid := GetCurrentProcessId;
   FMMFLauncher.Write;
 
@@ -148,38 +148,33 @@ procedure TLauncher.WMStart;
 var
   Res: TStartProcessRes;
 begin
-  FMMFLauncher.LauncherHandle := OpenProcess(SYNCHRONIZE, True, GetCurrentProcessId);
   FMMFLauncher.LauncherWindowHandle := FHandle;
   FMMFLauncher.Write;
 
-  try
-    Res := TFunctions.StartProcess(TPaths.WhatsAppExePath, Format('-%s %d', [MMFHANDLE_ARG, FMMFLauncher.Handle]), True, True);
-    if not Res.Success then
-    begin
-      TFunctions.MessageBox(0, 'WhatsApp could not be started.', 'Error', MB_ICONERROR);
-      PostQuitMessage(1);
-      Exit;
-    end;
-
-    FProcessMonitor.Start;
-
-    FProcessMonitor.AddProcessId(Res.ProcessId);
-
-    if not TFunctions.InjectLibrary(FMMFLauncher, Res.ProcessHandle, Res.ThreadHandle) then
-    begin
-      TerminateProcess(Res.ProcessHandle, 100);
-
-      TFunctions.MessageBox(0, 'Error injecting library.', 'Error', MB_ICONERROR);
-      PostQuitMessage(1);
-      Exit;
-    end else
-      ResumeThread(Res.ThreadHandle);
-
-    CloseHandle(Res.ProcessHandle);
-    CloseHandle(Res.ThreadHandle);
-  finally
-    CloseHandle(FMMFLauncher.LauncherHandle);
+  Res := TFunctions.StartProcess(TPaths.WhatsAppExePath, '', False, True);
+  if not Res.Success then
+  begin
+    TFunctions.MessageBox(0, 'WhatsApp could not be started.', 'Error', MB_ICONERROR);
+    PostQuitMessage(1);
+    Exit;
   end;
+
+  FProcessMonitor.Start;
+
+  FProcessMonitor.AddProcessId(Res.ProcessId);
+
+  if not TFunctions.InjectLibrary(FMMFLauncher, Res.ProcessHandle, Res.ThreadHandle) then
+  begin
+    TerminateProcess(Res.ProcessHandle, 100);
+
+    TFunctions.MessageBox(0, 'Error injecting library.', 'Error', MB_ICONERROR);
+    PostQuitMessage(1);
+    Exit;
+  end else
+    ResumeThread(Res.ThreadHandle);
+
+  CloseHandle(Res.ProcessHandle);
+  CloseHandle(Res.ThreadHandle);
 end;
 
 procedure TLauncher.WMCheckResources;

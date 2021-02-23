@@ -17,7 +17,7 @@ var
   MMFLauncher: TMMFLauncher;
   Log: TLog;
   Window: TWindow;
-  MMFHandle, DetachEvent: THandle;
+  LauncherHandle, DetachEvent: THandle;
 
 procedure MainWindowCreated(Handle: THandle);
 begin
@@ -29,7 +29,7 @@ var
   Res: Cardinal;
   WaitHandles: TWOHandleArray;
 begin
-  WaitHandles[0] := MMFLauncher.LauncherHandle;
+  WaitHandles[0] := LauncherHandle;
   WaitHandles[1] := DetachEvent;
   Res := WaitForMultipleObjects(2, @WaitHandles, False, INFINITE);
   if Res = WAIT_OBJECT_0 then
@@ -43,7 +43,7 @@ end;
 procedure ProcessAttach;
 var
   WatchThreadId: Cardinal;
-  ExeName, MMFHandleStr: string;
+  ExeName: string;
 begin
   try
     TFunctions.Init;
@@ -53,19 +53,14 @@ begin
     if (ExeName <> WHATSAPP_EXE) and (ExeName <> UPDATE_EXE) then
       Exit;
 
-    if not TFunctions.FindCmdLineSwitch(MMFHANDLE_ARG, MMFHandleStr) then
-      Exit;
+    MMFLauncher := TMMFLauncher.Create;
+    MMFLauncher.Read;
 
-    try
-      MMFHandle := StrToInt(MMFHandleStr);
-      MMFLauncher := TMMFLauncher.Create(MMFHandle);
-      MMFLauncher.Read;
-    except
-      Exit;
-    end;
+    LauncherHandle := OpenProcess(SYNCHRONIZE, False, MMFLauncher.LauncherPid);
+    if LauncherHandle = 0 then
+      raise Exception.Create('Error opening launcher process,');
 
-    Log := TLog.Create(MMFLauncher.LogFileHandle);
-
+    Log := TLog.Create(MMFLauncher.LogFileName);
     Log.Info(Format('Injected into process %d, executable %s', [GetCurrentProcessId, ExtractFileName(TPaths.ExePath)]));
 
     SendMessage(MMFLauncher.LauncherWindowHandle, WM_CHILD_PROCESS_STARTED, GetCurrentProcessId, 0);
@@ -92,24 +87,19 @@ end;
 
 procedure ProcessDetach;
 begin
+  CloseHandle(LauncherHandle);
+
   if Assigned(Window) then
     Window.Free;
 
   if Assigned(MMFLauncher) then
-  begin
-    if MMFLauncher.LauncherHandle > 0 then
-      CloseHandle(MMFLauncher.LauncherHandle);
     MMFLauncher.Free;
-  end;
 
   if Assigned(Log) then
     Log.Free;
 
   if DetachEvent > 0 then
     SetEvent(DetachEvent);
-
-  if MMFHandle > 0 then
-    CloseHandle(MMFHandle);
 end;
 
 {$R *.res}
