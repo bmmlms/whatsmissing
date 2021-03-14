@@ -30,7 +30,7 @@ begin
     ProcessHandle := StrToInt(ProcessHandleStr);
     ThreadHandle := StrToInt(ThreadHandleStr);
 
-    MMFLauncher := TMMFLauncher.Create;
+    MMFLauncher := TMMFLauncher.Create(False);
     try
       MMFLauncher.Read;
 
@@ -53,7 +53,7 @@ var
 begin
   if TMMF.Exists(MMFNAME_SETTINGS) then
   begin
-    MMFSettings := TMMFSettings.Create;
+    MMFSettings := TMMFSettings.Create(False);
     try
       MMFSettings.Read;
 
@@ -67,7 +67,7 @@ begin
 
   Application.Initialize;
   Application.CaptureExceptions := False;
-  Application.Title := APP_NAME;
+  Application.Title := APPNAME;
   Application.CreateForm(TfrmSettings, F);
   Application.Run;
 end;
@@ -79,7 +79,7 @@ var
 begin
   if TMMF.Exists(MMFNAME_LAUNCHER) then
   begin
-    MMFLauncher := TMMFLauncher.Create;
+    MMFLauncher := TMMFLauncher.Create(False);
     try
       MMFLauncher.Read;
 
@@ -129,15 +129,15 @@ begin
 
     if IsPrepareUninstall then
     begin
-      UninstallerPath := ConcatPaths([TPaths.TempDir, Format('%s_uninstall.exe', [APP_NAME])]);
+      UninstallerPath := ConcatPaths([TPaths.TempDir, '%s_uninstall.exe'.Format([APPNAME])]);
       if not FileUtil.CopyFile(TPaths.ExePath, UninstallerPath, False, False) then
-        raise Exception.Create(Format('Error copying uninstaller to "%s"', [UninstallerPath]));
+        raise Exception.Create('Error copying uninstaller to "%s"'.Format([UninstallerPath]));
 
       ProcHandle := OpenProcess(SYNCHRONIZE, True, GetCurrentProcessId);
       try
-        StartProcessRes := TFunctions.StartProcess(UninstallerPath, Format('-%s -%s %d', [UNINSTALL_ARG, UNINSTALL_PARENTHANDLE_ARG, ProcHandle]), True, False);
+        StartProcessRes := TFunctions.StartProcess(UninstallerPath, '-%s -%s %d'.Format([UNINSTALL_ARG, UNINSTALL_PARENTHANDLE_ARG, ProcHandle]), True, False);
         if not StartProcessRes.Success then
-          raise Exception.Create(Format('Error starting uninstaller "%s"', [UninstallerPath]));
+          raise Exception.Create('Error starting uninstaller "%s"'.Format([UninstallerPath]));
 
         CloseHandle(StartProcessRes.ProcessHandle);
         CloseHandle(StartProcessRes.ThreadHandle);
@@ -145,6 +145,9 @@ begin
         CloseHandle(ProcHandle);
       end;
     end;
+
+    if not Succeeded(CoInitialize(nil)) then
+      raise Exception.Create('CoInitialize() failed');
 
     if IsUninstall then
     begin
@@ -163,9 +166,6 @@ begin
 
       TFunctions.SetCurrentProcessExplicitAppUserModelID('com.squirrel.WhatsApp.WhatsApp');
 
-      if not Succeeded(CoInitialize(nil)) then
-        raise Exception.Create('CoInitialize() failed');
-
       if IsLauncher then
       begin
         SysUtils.DeleteFile(ConcatPaths([TPaths.TempDir, LOGFILE]));
@@ -175,9 +175,9 @@ begin
         RunLauncher(Log);
       end else
         RunSettings;
-
-      CoUninitialize;
     end;
+
+    CoUninitialize;
   except
     on E: Exception do
     begin
@@ -186,11 +186,11 @@ begin
 
       if Assigned(Log) then
       begin
-        Log.Error(Format('Main: %s', [E.Message]));
+        Log.Error('Main: %s'.Format([E.Message]));
         Log.Free;
       end;
 
-      TFunctions.MessageBox(0, Format('%s encountered an error: %s', [APP_NAME, E.Message]), 'Error', MB_ICONERROR);
+      TFunctions.MessageBox(0, E.Message, '%s error'.Format([APPNAME]), MB_ICONERROR);
 
       ExitProcess(1);
     end;

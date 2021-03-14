@@ -36,8 +36,6 @@ var
 begin
   FFileName := FileName;
   FHandle := TFunctions.CreateFile(FileName, FILE_APPEND_DATA, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-  if FHandle = INVALID_HANDLE_VALUE then
-    raise Exception.Create(Format('Error opening log file "%s"', [FileName]));
   if GetLastError <> ERROR_ALREADY_EXISTS then
     WriteFile(FHandle, UTF8_BOM[0], Length(UTF8_BOM), W, nil);
 end;
@@ -51,17 +49,17 @@ end;
 
 procedure TLog.Debug(const Msg: string);
 begin
-  Write(Format('%s - %s', ['DEBUG', Msg]));
+  Write('%s - %s'.Format(['DEBUG', Msg]));
 end;
 
 procedure TLog.Info(const Msg: string);
 begin
-  Write(Format('%s - %s', ['INFO', Msg]));
+  Write('%s - %s'.Format(['INFO', Msg]));
 end;
 
 procedure TLog.Error(const Msg: string);
 begin
-  Write(Format('%s - %s', ['ERROR', Msg]));
+  Write('%s - %s'.Format(['ERROR', Msg]));
 end;
 
 procedure TLog.Write(const Msg: string);
@@ -72,7 +70,7 @@ begin
   if FHandle = 0 then
     raise Exception.Create('Log file not opened');
 
-  Bytes := TEncoding.UTF8.GetBytes(Format('%s - %s [%d] - %s'#13#10, [FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now), ExtractFileName(TPaths.ExePath.ToUpper), GetCurrentProcessId, Msg]));
+  Bytes := TEncoding.UTF8.GetBytes('%s - %s [%d] - %s'#13#10.Format([FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now), ExtractFileName(TPaths.ExePath.ToUpper), GetCurrentProcessId, Msg]));
 
   WriteFile(FHandle, Bytes[0], Length(Bytes), W, nil);
 end;

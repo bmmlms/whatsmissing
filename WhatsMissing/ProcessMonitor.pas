@@ -48,7 +48,7 @@ begin
   inherited Create(True);
 
   InitializeCriticalSection(FCriticalSection);
-  FReloadEvent := CreateEvent(nil, False, False, nil);
+  FReloadEvent := TFunctions.CreateEvent(nil, False, False, '');
   FProcesses := TList<TProcess>.Create;
 end;
 

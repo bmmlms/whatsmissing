@@ -6,10 +6,8 @@ uses
   Constants,
   Functions,
   Log,
-  Messages,
   MMF,
   Paths,
-  Settings,
   ShellAPI,
   SysUtils,
   Windows;
@@ -61,17 +59,19 @@ type
 
   TCreateDIBSection = function(_para1: HDC; const _para2: BITMAPV5HEADER; _para3: UINT; var _para4: Pointer; _para5: HANDLE; _para6: DWORD): HBITMAP; stdcall;
 
+  { TWindow }
+
   TWindow = class
   private
     FMMFLauncher: TMMFLauncher;
     FLog: TLog;
     FHandle, FNotificationAreaHandle, FLastForegroundWindowHandle, FMessageNotificationIcon, FMouseHook: THandle;
     FOriginalWndProc: Pointer;
-    FAlwaysOnTop, FNotificationVisible, FNewMessages, FExiting, FWasInCloseButton, FShown: Boolean;
-    FSettings: TSettings;
+    FHideMaximize, FAlwaysOnTop, FNotificationIconVisible, FNewMessages, FExiting, FWasInCloseButton, FShown: Boolean;
     FNotifyData: TNotifyIconDataW;
     FNotificationMenu: HMENU;
     FTaskbarCreatedMsg: Cardinal;
+    FForegroundForNotificationIcon: Boolean;
 
     class function WndProcWrapper(hwnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall; static;
     class function MouseHookWrapper(Code: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall; static;
@@ -83,10 +83,12 @@ type
     function MenuSelect(const ID: UINT): Boolean;
     function GetIcon(const Handle: HWND): HICON;
     procedure ShowNotificationIcon;
+    procedure UpdateNotificationIcon;
+    procedure HideNotificationIcon;
     procedure Fade(const FadeIn: Boolean);
     procedure ShowMainWindow;
     procedure HideMainWindow;
-    procedure ShowNotificationMenu;
+    procedure ShowNotificationIconMenu;
     procedure ModifySystemMenu;
     procedure CreateNotificationMenu;
     procedure SetAlwaysOnTop(const Enabled: Boolean);
@@ -94,14 +96,17 @@ type
     procedure ChatMessagesRead;
     procedure CreateMessageNotificationIcon;
   public
-    constructor Create(const hwnd: HWND; const MMFLauncher: TMMFLauncher; const Log: TLog);
+    constructor Create(const hwnd: HWND; const Log: TLog);
     destructor Destroy; override;
+
+    procedure SettingsChanged(const OldMMF: TMMFLauncher);
   end;
 
 implementation
 
 const
   WM_OPEN_SETTINGS = WM_USER + 1;
+  WM_SETTINGS_CHANGED = WM_USER + 2;
 
   MENU_ALWAYSONTOP = 1;
   MENU_SETTINGS = 2;
@@ -138,30 +143,30 @@ begin
   Result := TWindow(WindowProp).MouseHook(Code, wParam, lParam);
 end;
 
-constructor TWindow.Create(const hwnd: HWND; const MMFLauncher: TMMFLauncher; const Log: TLog);
+constructor TWindow.Create(const hwnd: HWND; const Log: TLog);
 begin
   FHandle := hwnd;
-  FMMFLauncher := MMFLauncher;
   FLog := Log;
 
-  FSettings := TSettings.Create(TPaths.SettingsPath);
+  FMMFLauncher := TMMFLauncher.Create(False);
+  FMMFLauncher.Read;
+  FHideMaximize := FMMFLauncher.HideMaximize;
 
   SetPropW(FHandle, WNDPROC_PROPNAME, HANDLE(Self));
 
   TFunctions.SetPropertyStore(FHandle, TFunctions.GetWhatsMissingExePath(FMMFLauncher, TFunctions.IsWindows64Bit), TPaths.WhatsAppExePath);
 
   // Install new WndProc
-  FOriginalWndProc := Pointer(GetWindowLongPtrW(FHandle, GWLP_WNDPROC));
-  SetWindowLongPtrW(FHandle, GWLP_WNDPROC, LONG_PTR(@WndProcWrapper));
+  FOriginalWndProc := Pointer(SetWindowLongPtrW(FHandle, GWLP_WNDPROC, LONG_PTR(@WndProcWrapper)));
 
   // Prevent maximizing the window on doubleclick on titlebar
-  if FSettings.HideMaximize then
+  if FHideMaximize then
     SetWindowLongPtrW(FHandle, GWL_STYLE, GetWindowLongPtr(FHandle, GWL_STYLE) xor WS_MAXIMIZEBOX);
 
   // Install mouse hook for "X" button in titlebar
   FMouseHook := SetWindowsHookExW(WH_MOUSE, @MouseHookWrapper, 0, GetCurrentThreadId);
 
-  SetAlwaysOnTop(FSettings.AlwaysOnTop);
+  SetAlwaysOnTop(FMMFLauncher.AlwaysOnTop);
 
   ModifySystemMenu;
   CreateNotificationMenu;
@@ -175,17 +180,18 @@ destructor TWindow.Destroy;
 begin
   UnhookWindowsHookEx(FMouseHook);
   DestroyIcon(FMessageNotificationIcon);
-  FSettings.Free;
 
-  if FNotificationVisible then
-  begin
-    FNotificationVisible := False;
-    ;
-    Shell_NotifyIconW(NIM_DELETE, @FNotifyData);
-  end;
+  HideNotificationIcon;
+end;
+
+procedure TWindow.SettingsChanged(const OldMMF: TMMFLauncher);
+begin
+  SendMessage(FHandle, WM_SETTINGS_CHANGED, LONG_PTR(OldMMF), 0);
 end;
 
 function TWindow.WndProc(uMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT;
+var
+  OldMMF: TMMFLauncher;
 begin
   case uMsg of
     WM_SYSCOMMAND:
@@ -194,7 +200,7 @@ begin
       else
         case wParam of
           SC_MAXIMIZE:
-            if FSettings.HideMaximize then
+            if FHideMaximize then
               Exit(0);
           SC_MINIMIZE:
             // If minimized by clicking "_" in the titlebar the "_" button will look hovered after restoring the window, this fixes it.
@@ -203,28 +209,38 @@ begin
     WM_INITMENUPOPUP:
       MenuPopup(wParam);
     WM_SHOWWINDOW:
-      if (wParam <> 0) and (not FShown) then
+      if Boolean(wParam) and (not FShown) then
       begin
         FShown := True;
 
-        if FSettings.ShowNotificationIcon then
+        if FMMFLauncher.ShowNotificationIcon then
           ShowNotificationIcon;
       end;
     WM_CLOSE:
       // Prevent closing of window
-      if FNotificationVisible and (not FExiting) then
+      if FNotificationIconVisible and (not FExiting) then
       begin
         HideMainWindow;
         Exit(0);
       end;
     WM_KEYDOWN:
-      if FNotificationVisible and (wParam = VK_ESCAPE) then
+      if FNotificationIconVisible and (wParam = VK_ESCAPE) then
       begin
         HideMainWindow;
         Exit(0);
       end;
+    WM_ACTIVATE:
+      // If WM_ACTIVATE was received from ShowNotificationIconMenu the Message is not forwarded to WhatsApp to suppress sending of "available" presence
+      if FForegroundForNotificationIcon then
+        Exit(DefWindowProcW(FHandle, uMsg, wParam, lParam));
     WM_SETFOCUS:
+    begin
       PostMessage(FHandle, WM_CHAT, WC_READ, 0);
+
+      FMMFLauncher.Read;
+      FMMFLauncher.JIDMessageTimes.Clear;
+      FMMFLauncher.Write;
+    end;
     WM_EXIT:
     begin
       FExiting := True;
@@ -236,28 +252,18 @@ begin
     end;
     WM_NCDESTROY:
     begin
-      FSettings.Load;
-      FSettings.AlwaysOnTop := FAlwaysOnTop;
-      try
-        FSettings.Save;
-      except
-        on E: Exception do
-          FLog.Error('WndProc(): Error saving settings: ' + E.Message);
-      end;
+      FMMFLauncher.AlwaysOnTop := FAlwaysOnTop;
+      FMMFLauncher.Write;
+      FMMFLauncher.Free;
 
-      if FNotificationVisible then
-      begin
-        FNotificationVisible := False;
-        Shell_NotifyIconW(NIM_DELETE, @FNotifyData);
-      end;
-
+      HideNotificationIcon;
       RemovePropW(FHandle, WNDPROC_PROPNAME);
       TFunctions.ClearPropertyStore(FHandle);
       DestroyMenu(FNotificationMenu);
     end;
     WM_CHAT:
     begin
-      if FNotificationVisible and (wParam = WC_RECEIVED) and (GetForegroundWindow <> FHandle) then
+      if FNotificationIconVisible and (wParam = WC_RECEIVED) and (GetForegroundWindow <> FHandle) then
         ChatMessageReceived
       else if wParam = WC_READ then
         ChatMessagesRead;
@@ -270,8 +276,30 @@ begin
     end;
     WM_OPEN_SETTINGS:
     begin
-      TFunctions.StartProcess(TFunctions.GetWhatsMissingExePath(FMMFLauncher, TFunctions.IsWindows64Bit), Format('-%s', [SETTINGS_ARG]), False, False);
+      TFunctions.StartProcess(TFunctions.GetWhatsMissingExePath(FMMFLauncher, TFunctions.IsWindows64Bit), '-%s'.Format([SETTINGS_ARG]), False, False);
       Exit(0);
+    end;
+    WM_SETTINGS_CHANGED:
+    begin
+      FMMFLauncher.Read;
+      OldMMF := TMMFLauncher(wParam);
+
+      if OldMMF.ShowNotificationIcon <> FMMFLauncher.ShowNotificationIcon then
+        if FMMFLauncher.ShowNotificationIcon then
+          ShowNotificationIcon
+        else
+        begin
+          if not IsWindowVisible(FHandle) then
+            ShowMainWindow;
+          HideNotificationIcon;
+        end;
+
+      if (OldMMF.IndicateNewMessages <> FMMFLauncher.IndicateNewMessages) or (OldMMF.IndicatorColor <> FMMFLauncher.IndicatorColor) then
+      begin
+        DestroyIcon(FMessageNotificationIcon);
+        CreateMessageNotificationIcon;
+        UpdateNotificationIcon;
+      end;
     end;
     WM_NOTIFICATION_ICON:
     begin
@@ -304,7 +332,7 @@ begin
         WM_CONTEXTMENU:
         begin
           PostMessage(FHandle, WM_CHAT, WC_READ, 0);
-          ShowNotificationMenu;
+          ShowNotificationIconMenu;
         end;
       end;
       Exit(0);
@@ -312,7 +340,7 @@ begin
     else
       if uMsg = FTaskbarCreatedMsg then
       begin
-        if FSettings.ShowNotificationIcon then
+        if FMMFLauncher.ShowNotificationIcon then
           ShowNotificationIcon;
         Exit(0);
       end;
@@ -327,7 +355,7 @@ var
 var
   MHS: PMOUSEHOOKSTRUCT;
 begin
-  if (wParam = WM_NCLBUTTONDBLCLK) and FSettings.HideMaximize then
+  if (wParam = WM_NCLBUTTONDBLCLK) and FHideMaximize then
     Exit(1);
 
   MHS := PMOUSEHOOKSTRUCT(lParam);
@@ -345,7 +373,7 @@ begin
       try
         if FWasInCloseButton then
         begin
-          HideMainWindow;
+          SendMessage(FHandle, WM_CLOSE, 0, 0);
           Exit(1);
         end;
       finally
@@ -422,7 +450,7 @@ end;
 procedure TWindow.ShowNotificationIcon;
 begin
   FNotificationAreaHandle := FindWindow('Shell_TrayWnd', nil);
-  if FNotificationAreaHandle = 0 then
+  if FNotificationIconVisible or (FNotificationAreaHandle = 0) then
     Exit;
 
   ZeroMemory(@FNotifyData, SizeOf(FNotifyData));
@@ -431,12 +459,40 @@ begin
   FNotifyData.uID := 1;
   FNotifyData.uFlags := NIF_MESSAGE or NIF_ICON or NIF_TIP;
   FNotifyData.uCallbackMessage := WM_NOTIFICATION_ICON;
-  FNotifyData.hIcon := GetIcon(FHandle);
   FNotifyData.uVersion := NOTIFYICON_VERSION;
+
+  if FNewMessages and (FMMFLauncher.IndicateNewMessages) then
+    FNotifyData.hIcon := FMessageNotificationIcon
+  else
+    FNotifyData.hIcon := GetIcon(FHandle);
+
   StrPLCopy(FNotifyData.szTip, 'WhatsApp', Length(FNotifyData.szTip) - 1);
-  FNotificationVisible := Shell_NotifyIconW(NIM_ADD, @FNotifyData);
-  if FNotificationVisible then
+
+  FNotificationIconVisible := Shell_NotifyIconW(NIM_ADD, @FNotifyData);
+  if FNotificationIconVisible then
     Shell_NotifyIconW(NIM_SETVERSION, @FNotifyData);
+end;
+
+procedure TWindow.UpdateNotificationIcon;
+begin
+  if not FNotificationIconVisible then
+    Exit;
+
+  if FNewMessages and (FMMFLauncher.IndicateNewMessages) then
+    FNotifyData.hIcon := FMessageNotificationIcon
+  else
+    FNotifyData.hIcon := GetIcon(FHandle);
+
+  Shell_NotifyIconW(NIM_MODIFY, @FNotifyData);
+end;
+
+procedure TWindow.HideNotificationIcon;
+begin
+  if not FNotificationIconVisible then
+    Exit;
+
+  FNotificationIconVisible := False;
+  Shell_NotifyIconW(NIM_DELETE, @FNotifyData);
 end;
 
 procedure TWindow.SetAlwaysOnTop(const Enabled: Boolean);
@@ -507,12 +563,14 @@ begin
   ShowWindow(FHandle, SW_HIDE);
 end;
 
-procedure TWindow.ShowNotificationMenu;
+procedure TWindow.ShowNotificationIconMenu;
 var
   Point: TPoint;
   Res: Cardinal;
 begin
+  FForegroundForNotificationIcon := True;
   SetForegroundWindow(FHandle);
+  FForegroundForNotificationIcon := False;
 
   GetCursorPos(Point);
 
@@ -528,7 +586,7 @@ var
 begin
   Menu := GetSystemMenu(FHandle, False);
 
-  if FSettings.HideMaximize then
+  if FHideMaximize then
     DeleteMenu(Menu, SC_MAXIMIZE, MF_BYCOMMAND);
 
   MenuItemInfo.cbSize := SizeOf(MenuItemInfo);
@@ -561,8 +619,6 @@ begin
   if FNotificationMenu = 0 then
     Exit;
 
-  SetForegroundWindow(FHandle);
-
   AppendMenu(FNotificationMenu, MF_STRING, MENU_ALWAYSONTOP, '&Always on top');
 
   AppendMenu(FNotificationMenu, MF_STRING, MENU_SETTINGS, 'S&ettings...');
@@ -576,19 +632,15 @@ procedure TWindow.ChatMessageReceived;
 begin
   FNewMessages := True;
 
-  if FSettings.IndicateNewMessages and (FMessageNotificationIcon > 0) then
-  begin
-    FNotifyData.hIcon := FMessageNotificationIcon;
-    Shell_NotifyIconW(NIM_MODIFY, @FNotifyData);
-  end;
+  if FMMFLauncher.IndicateNewMessages then
+    UpdateNotificationIcon;
 end;
 
 procedure TWindow.ChatMessagesRead;
 begin
   FNewMessages := False;
 
-  FNotifyData.hIcon := GetIcon(FHandle);
-  Shell_NotifyIconW(NIM_MODIFY, @FNotifyData);
+  UpdateNotificationIcon;
 end;
 
 procedure TWindow.CreateMessageNotificationIcon;
@@ -611,7 +663,7 @@ var
     RGBQuad: PRGBQUAD;
   begin
     RGBQuad := BitmapStart;
-    while NativeUInt(RGBQuad) < NativeUInt(BitmapEnd) do
+    while RGBQuad < BitmapEnd do
     begin
       if (RGBQuad.rgbRed = GetRValue(Color)) and (RGBQuad.rgbGreen = GetGValue(Color)) and (RGBQuad.rgbBlue = GetBValue(Color)) then
         RGBQuad.rgbReserved := Alpha;
@@ -640,14 +692,14 @@ begin
 
   DC := CreateCompatibleDC(0);
   Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
-  BitmapEnd := Pointer(NativeUInt(BitmapStart) + (BitmapInfo.bmWidth * BitmapInfo.bmHeight * SizeOf(TRGBQUAD)));
+  BitmapEnd := BitmapStart + (BitmapInfo.bmWidth * BitmapInfo.bmHeight * SizeOf(TRGBQUAD));
 
   SelectObject(DC, Bmp);
   DrawIcon(DC, 0, 0, Icon);
 
   TransparentColor := ColorToRGB(123);
-  PenColor := ColorToRGB(FSettings.IndicatorColor - 1);
-  BrushColor := ColorToRGB(FSettings.IndicatorColor);
+  PenColor := ColorToRGB(FMMFLauncher.IndicatorColor - 1);
+  BrushColor := ColorToRGB(FMMFLauncher.IndicatorColor);
 
   CirclePos := Trunc(BitmapInfo.bmWidth / 2);
 

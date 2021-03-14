@@ -5,12 +5,15 @@ interface
 uses
   Classes,
   fpjson,
+  jsonparser,
+  Graphics,
   Functions,
   Generics.Collections,
-  jsonparser,
   SysUtils;
 
 {$I ImmersiveType.inc}
+
+// TODO: das hier ist nicht mehr shared. gehört nun zum exe-projekt only.
 
 type
   TResourcePatchColorAdjustment = (caDarken10 = -50, caDarken5 = -25, caDarken3 = -15, caDarken2 = -10, caDarken = -5, caNone = 0, caLighten = 5, caLighten2 = 10, caLighten3 = 15, caLighten5 = 25);
@@ -70,7 +73,8 @@ type
   private
     FFilePath: string;
 
-    FRebuildResources: Boolean;
+    FLastUsedVersion: string;
+    FLastResourceChecksum: UInt16;
 
     FResourcePatches: TList<TResourcePatchCollection>;
 
@@ -79,6 +83,8 @@ type
     FIndicatorColor: TColor;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
+    FDontSendPresence: Boolean;
+    FDontSendTyping: Boolean;
 
     procedure Reset;
   public
@@ -88,7 +94,8 @@ type
     procedure Load;
     procedure Save;
 
-    property RebuildResources: Boolean read FRebuildResources write FRebuildResources;
+    property LastUsedVersion: string read FLastUsedVersion write FLastUsedVersion;
+    property LastResourceChecksum: UInt16 read FLastResourceChecksum write FLastResourceChecksum;
 
     property ResourcePatches: TList<TResourcePatchCollection> read FResourcePatches;
 
@@ -97,6 +104,8 @@ type
     property IndicatorColor: TColor read FIndicatorColor write FIndicatorColor;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
+    property DontSendPresence: Boolean read FDontSendPresence write FDontSendPresence;
+    property DontSendTyping: Boolean read FDontSendTyping write FDontSendTyping;
   end;
 
 implementation
@@ -142,12 +151,15 @@ begin
     try
       JSONObject := TJSONObject(GetJSON(FS));
       try
-        FRebuildResources := JSONObject.Get('RebuildResources', FRebuildResources);
+        FLastUsedVersion := JSONObject.Get('LastUsedVersion', FLastUsedVersion);
+        FLastResourceChecksum := JSONObject.Get('LastResourceChecksum', FLastResourceChecksum);
         FShowNotificationIcon := JSONObject.Get('ShowNotificationIcon', FShowNotificationIcon);
         FIndicateNewMessages := JSONObject.Get('IndicateNewMessages', FIndicateNewMessages);
         FIndicatorColor := JSONObject.Get('IndicatorColor', FIndicatorColor);
         FHideMaximize := JSONObject.Get('HideMaximize', FHideMaximize);
         FAlwaysOnTop := JSONObject.Get('AlwaysOnTop', FAlwaysOnTop);
+        FDontSendPresence := JSONObject.Get('DontSendPresence', FDontSendPresence);
+        FDontSendTyping := JSONObject.Get('DontSendTyping', FDontSendTyping);
 
         JSONArray := JSONObject.Get('ResourcePatches', TJSONArray(nil));
 
@@ -187,12 +199,15 @@ begin
 
   JSONObject := TJSONObject.Create;
   try
-    JSONObject.Add('RebuildResources', FRebuildResources);
+    JSONObject.Add('LastUsedVersion', FLastUsedVersion);
+    JSONObject.Add('LastResourceChecksum', FLastResourceChecksum);
     JSONObject.Add('ShowNotificationIcon', FShowNotificationIcon);
     JSONObject.Add('IndicateNewMessages', FIndicateNewMessages);
     JSONObject.Add('IndicatorColor', FIndicatorColor);
     JSONObject.Add('HideMaximize', FHideMaximize);
     JSONObject.Add('AlwaysOnTop', FAlwaysOnTop);
+    JSONObject.Add('DontSendPresence', FDontSendPresence);
+    JSONObject.Add('DontSendTyping', FDontSendTyping);
 
     JSONArray := TJSONArray.Create;
     JSONObject.Add('ResourcePatches', JSONArray);
@@ -284,12 +299,13 @@ begin
   FResourcePatches.Add(TResourcePatchCollection.Create(7, 'Close button hover color', clDefault, ImmersiveHardwareTitleBarCloseButtonHover, rpaImmersive,
     [TResourcePatch.Create('#windows-title-close:hover{background-color:var(--teal-hover)}', '#windows-title-close:hover{background-color:#%COLOR%}')]));
 
-  FRebuildResources := False;
   FShowNotificationIcon := True;
   FIndicateNewMessages := True;
   FIndicatorColor := TFunctions.HTMLToColor('fe9500');
   FHideMaximize := False;
   FAlwaysOnTop := False;
+  FDontSendPresence := False;
+  FDontSendTyping := False;
 end;
 
 { TResourcePatch }

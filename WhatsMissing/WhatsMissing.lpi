@@ -27,9 +27,8 @@
     </General>
     <VersionInfo>
       <UseVersionInfo Value="True"/>
-      <MinorVersionNr Value="1"/>
-      <RevisionNr Value="1"/>
-      <StringTable FileDescription="WhatsMissing" ProductName="WhatsMissing" ProductVersion="0.1.1.0"/>
+      <MinorVersionNr Value="2"/>
+      <StringTable FileDescription="WhatsMissing" ProductName="WhatsMissing" ProductVersion="0.2.0.0"/>
     </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="Debug" Default="True"/>
@@ -133,7 +132,7 @@
         <IsPartOfProject Value="True"/>
       </Unit10>
       <Unit11>
-        <Filename Value="..\Shared\Settings.pas"/>
+        <Filename Value="Settings.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit11>
     </Units>
@@ -181,7 +180,7 @@
     </Linking>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="3">
+    <Exceptions Count="4" IgnoreAll="True">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>
@@ -191,6 +190,9 @@
       <Item3>
         <Name Value="EFOpenError"/>
       </Item3>
+      <Item4>
+        <Name Value="Exception"/>
+      </Item4>
     </Exceptions>
   </Debugging>
 </CONFIG>

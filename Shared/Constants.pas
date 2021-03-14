@@ -11,8 +11,9 @@ const
   // Launcher window messages
   WM_CHILD_PROCESS_STARTED = WM_SHARED + 1;
   WM_MAINWINDOW_CREATED = WM_SHARED + 2;
-  WM_CHECK_RESOURCES = WM_SHARED + 3;
-  WM_CHECK_LINKS = WM_SHARED + 4;
+  WM_WINDOW_SHOWN = WM_SHARED + 3;
+  WM_PATCH_RESOURCES = WM_SHARED + 4;
+  WM_CHECK_LINKS = WM_SHARED + 5;
 
   // WhatsApp window messages
   WM_CHAT = WM_SHARED + 10;
@@ -25,13 +26,12 @@ const
   WC_RECEIVED = 1;
   WC_READ = 2;
 
-  APP_NAME = 'WhatsMissing';
+  APPNAME = 'WhatsMissing';
   WHATSMISSING_CLASSNAME: PWideChar = 'WhatsMissing_WndCls';
   WHATSMISSING_EXENAME_32 = 'whatsmissing-i386.exe';
   WHATSMISSING_EXENAME_64 = 'whatsmissing-x86_64.exe';
   WHATSMISSING_LIBRARYNAME_32 = 'whatsmissing-i386.dll';
   WHATSMISSING_LIBRARYNAME_64 = 'whatsmissing-x86_64.dll';
-  RESOURCES_DIR_NAME = 'Resources';
   WHATSAPP_CLASSNAME: PWideChar = 'Chrome_WidgetWin_1';
   WHATSAPP_WINDOWNAME: PWideChar = 'WhatsApp';
 
@@ -39,8 +39,11 @@ const
   UPDATE_EXE = 'update.exe';
   LOGFILE = 'whatsmissing.log';
 
-  MMFNAME_LAUNCHER = 'WM_Launcher';
-  MMFNAME_SETTINGS = 'WM_Settings';
+  MMFNAME_LAUNCHER = 'Local\WM_Launcher';
+  MMFNAME_SETTINGS = 'Local\WM_Settings';
+  MMFNAME_RESOURCES = 'Local\WM_Resources_%d';
+  EVENTNAME_RESOURCES = 'Local\WM_ResourcesEvent_%d';
+  EVENTNAME_SETTINGS_CHANGED = 'Local\WM_Settings_Changed';
 
   SETTINGS_ARG = 'settings';
   INJECT_ARG = 'inject';

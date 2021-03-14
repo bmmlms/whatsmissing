@@ -15,8 +15,6 @@ uses
   Windows;
 
 type
-  TColor = -$7FFFFFFF - 1..$7FFFFFFF;
-
   TCardinalArray = array of Cardinal;
 
   TStartProcessRes = record
@@ -39,6 +37,10 @@ type
   TIsWow64Process2 = function(hProcess: THandle; pProcessMachine: PUSHORT; pNativeMachine: PUSHORT): BOOL; stdcall;
   TQueueUserAPC = function(pfnAPC: Pointer; hThread: HANDLE; dwData: ULONG_PTR): DWORD; stdcall;
   TSHGetPropertyStoreForWindow = function(hwnd: HWND; const riid: REFIID; var ppv: Pointer): HRESULT; stdcall;
+  TRegisterWaitForSingleObject = function(phNewWaitObject: PHANDLE; hObject: HANDLE; Callback: PVOID; Context: PVOID; dwMilliseconds, dwFlags: ULONG): BOOL; stdcall;
+  TUnregisterWait = function(WaitHandle: HANDLE): BOOL; stdcall;
+
+  { TFunctions }
 
   TFunctions = class
   private
@@ -50,20 +52,31 @@ type
     FIsWow64Process2: TIsWow64Process2;
     FQueueUserAPC: TQueueUserAPC;
     FSHGetPropertyStoreForWindow: TSHGetPropertyStoreForWindow;
+    FRegisterWaitForSingleObject: TRegisterWaitForSingleObject;
+    FUnregisterWait: TUnregisterWait;
   public
     class procedure Init; static;
 
+    // Wrappers for windows functions
     class function MessageBox(hWnd: HWND; Text: string; Caption: string; uType: UINT): LongInt; static;
     class function CreateFile(FileName: string; dwDesiredAccess: DWORD; dwShareMode: DWORD; lpSecurityAttributes: LPSECURITY_ATTRIBUTES; dwCreationDisposition: DWORD; dwFlagsAndAttributes: DWORD; hTemplateFile: HANDLE): HANDLE; static;
+    class function CreateEvent(lpEventAttributes: LPSECURITY_ATTRIBUTES; bManualReset: WINBOOL; bInitialState: WINBOOL; Name: string): HANDLE;
+    class function OpenEvent(dwDesiredAccess: DWORD; bInheritHandle: WINBOOL; Name: string): HANDLE;
+    class function TryOpenEvent(dwDesiredAccess: DWORD; bInheritHandle: WINBOOL; Name: string): HANDLE;
+    class function CreateMutex(lpMutexAttributes: LPSECURITY_ATTRIBUTES; bInitialOwner: WINBOOL; Name: string): HANDLE;
+    class function CreateFileMapping(hFile: HANDLE; lpFileMappingAttributes: LPSECURITY_ATTRIBUTES; flProtect: DWORD; dwMaximumSizeHigh: DWORD; dwMaximumSizeLow: DWORD; Name: string): HANDLE;
+    class function OpenFileMapping(dwDesiredAccess: DWORD; bInheritHandle: WINBOOL; Name: string): HANDLE;
+
     class function GetSpecialFolder(const csidl: ShortInt): string;
     class function GetTempPath: string;
     class function HTMLToColor(const Color: string): TColor; static;
     class function ColorToHTML(const Color: TColor): string; static;
     class function ColorToRGBHTML(const Color: TColor): string; static;
-    class function GetPatchedResourceFilePath(Original: string): string; static;
+    class function GetResourceFilePath(const PID: Cardinal): string; static;
     class function InjectLibrary(const MMFLauncher: TMMFLauncher; const ProcessHandle, ThreadHandle: THandle): Boolean; static;
     class function SetPropertyStore(const Handle: THandle; const ExePath, IconPath: string): Boolean; static;
     class function ClearPropertyStore(const Handle: THandle): Boolean; static;
+    class function GetPidExePath(PID: Cardinal): string; static;
     class function GetExePath(ProcessHandle: THandle): string; static;
     class function IsWindows64Bit: Boolean; static;
     class function IsProcess64Bit(const Handle: THandle): Boolean; static;
@@ -73,6 +86,10 @@ type
     class function FindCmdLineSwitch(const Name: string; var Value: string): Boolean; static; overload;
     class function FindCmdLineSwitch(const Name: string): Boolean; static; overload;
 
+    class property RegisterWaitForSingleObject: TRegisterWaitForSingleObject read FRegisterWaitForSingleObject;
+    class property UnregisterWait: TUnregisterWait read FUnregisterWait;
+
+    // Functions only used by Launcher/Setup
     class procedure CheckWhatsAppInstalled; static;
     class function GetRunningExePids(const FilePath: string): TCardinalArray; static;
     class function GetRunningWhatsApp: TWindowProcessRes; static;
@@ -83,6 +100,8 @@ type
     class procedure ModifyShellLink(const LinkFile: string; const ExecutablePath: string); static;
     class procedure ModifyShellLinks(const FromCurrentPaths: array of string; const NewPath: string); static;
     class procedure RunUninstall(const Quiet: Boolean); static;
+    class function GetFileVersion(FileName: string): string; static;
+
     class property AllowSetForegroundWindow: TAllowSetForegroundWindow read FAllowSetForegroundWindow;
     class property SetCurrentProcessExplicitAppUserModelID: TSetCurrentProcessExplicitAppUserModelID read FSetCurrentProcessExplicitAppUserModelID;
   end;
@@ -106,6 +125,8 @@ begin
   FIsWow64Process2 := GetProcAddress(GetModuleHandle('kernelbase.dll'), 'IsWow64Process2');
   FQueueUserAPC := GetProcAddress(GetModuleHandle('kernelbase.dll'), 'QueueUserAPC');
   FAllowSetForegroundWindow := GetProcAddress(GetModuleHandle('user32.dll'), 'AllowSetForegroundWindow');
+  FRegisterWaitForSingleObject := GetProcAddress(GetModuleHandle('kernel32.dll'), 'RegisterWaitForSingleObject');
+  FUnregisterWait := GetProcAddress(GetModuleHandle('kernel32.dll'), 'UnregisterWait');
 
   try
     ModuleHandle := LoadLibraryA('shell32.dll');
@@ -116,7 +137,7 @@ begin
   end;
 
   if (not Assigned(FEnumProcesses)) or (not Assigned(FQueryFullProcessImageNameW)) or (not Assigned(FIsWow64Process2)) or (not Assigned(FQueueUserAPC)) or (not Assigned(FAllowSetForegroundWindow)) or
-    (not Assigned(FSetCurrentProcessExplicitAppUserModelID)) or (not Assigned(FSHGetPropertyStoreForWindow)) then
+    (not Assigned(FSetCurrentProcessExplicitAppUserModelID)) or (not Assigned(FSHGetPropertyStoreForWindow)) or (not Assigned(FRegisterWaitForSingleObject)) or (not Assigned(FUnregisterWait)) then
     raise Exception.Create('A required function could not be found, your windows version is most likely unsupported.');
 end;
 
@@ -135,6 +156,63 @@ var
 begin
   FileNameUnicode := FileName;
   Result := CreateFileW(PWideChar(FileNameUnicode), dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+  if Result = INVALID_HANDLE_VALUE then
+    raise Exception.Create('CreateFileW() failed: %d'.Format([GetLastError]));
+end;
+
+class function TFunctions.CreateEvent(lpEventAttributes: LPSECURITY_ATTRIBUTES; bManualReset: WINBOOL; bInitialState: WINBOOL; Name: string): HANDLE;
+var
+  NameUnicode: UnicodeString;
+begin
+  NameUnicode := Name;
+  Result := CreateEventW(lpEventAttributes, bManualReset, bInitialState, IfThen<PWideChar>(Name = '', nil, PWideChar(NameUnicode)));
+  if Result = 0 then
+    raise Exception.Create('CreateEventW() failed: %d'.Format([GetLastError]));
+end;
+
+class function TFunctions.OpenEvent(dwDesiredAccess: DWORD; bInheritHandle: WINBOOL; Name: string): HANDLE;
+begin
+  Result := TryOpenEvent(dwDesiredAccess, bInheritHandle, Name);
+  if Result = 0 then
+    raise Exception.Create('OpenEventW() failed: %d'.Format([GetLastError]));
+end;
+
+class function TFunctions.TryOpenEvent(dwDesiredAccess: DWORD; bInheritHandle: WINBOOL; Name: string): HANDLE;
+var
+  NameUnicode: UnicodeString;
+begin
+  NameUnicode := Name;
+  Result := OpenEventW(dwDesiredAccess, bInheritHandle, PWideChar(NameUnicode));
+end;
+
+class function TFunctions.CreateMutex(lpMutexAttributes: LPSECURITY_ATTRIBUTES; bInitialOwner: WINBOOL; Name: string): HANDLE;
+var
+  NameUnicode: UnicodeString;
+begin
+  NameUnicode := Name;
+  Result := CreateMutexW(lpMutexAttributes, bInitialOwner, PWideChar(NameUnicode));
+  if Result = 0 then
+    raise Exception.Create('CreateMutexW() failed: %d'.Format([GetLastError]));
+end;
+
+class function TFunctions.CreateFileMapping(hFile: HANDLE; lpFileMappingAttributes: LPSECURITY_ATTRIBUTES; flProtect: DWORD; dwMaximumSizeHigh: DWORD; dwMaximumSizeLow: DWORD; Name: string): HANDLE;
+var
+  NameUnicode: UnicodeString;
+begin
+  NameUnicode := Name;
+  Result := CreateFileMappingW(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, IfThen<PWideChar>(Name = '', nil, PWideChar(NameUnicode)));
+  if Result = 0 then
+    raise Exception.Create('CreateFileMappingW() failed: %d'.Format([GetLastError]));
+end;
+
+class function TFunctions.OpenFileMapping(dwDesiredAccess: DWORD; bInheritHandle: WINBOOL; Name: string): HANDLE;
+var
+  NameUnicode: UnicodeString;
+begin
+  NameUnicode := Name;
+  Result := OpenFileMappingW(dwDesiredAccess, bInheritHandle, IfThen<PWideChar>(Name = '', nil, PWideChar(NameUnicode)));
+  if Result = 0 then
+    raise Exception.Create(('OpenFileMappingW() failed: %d').Format([GetLastError]));
 end;
 
 class function TFunctions.GetSpecialFolder(const csidl: ShortInt): string;
@@ -143,7 +221,7 @@ var
 begin
   SetLength(Buf, 1024);
   if Failed(SHGetFolderPathW(0, csidl, 0, SHGFP_TYPE_CURRENT, PWideChar(Buf))) then
-    raise Exception.Create('SHGetFolderPath() failed');
+    raise Exception.Create('SHGetFolderPathW() failed');
   Result := PWideChar(Buf);
 end;
 
@@ -168,7 +246,7 @@ end;
 
 class function TFunctions.ColorToHTML(const Color: TColor): string;
 begin
-  Result := Format('%.2x%.2x%.2x', [GetRValue(Color), GetGValue(Color), GetBValue(Color)]);
+  Result := '%.2x%.2x%.2x'.Format([GetRValue(Color), GetGValue(Color), GetBValue(Color)]);
 end;
 
 class function TFunctions.ColorToRGBHTML(const Color: TColor): string;
@@ -176,12 +254,11 @@ begin
   Result := IntToStr(Color and $FF) + ',' + IntToStr((Color shr 8) and $FF) + ',' + IntToStr((Color shr 16) and $FF);
 end;
 
-class function TFunctions.GetPatchedResourceFilePath(Original: string): string;
+class function TFunctions.GetResourceFilePath(const PID: Cardinal): string;
 begin
-  Original := Original.ToLower;
-  if Original.StartsWith('\\?\', True) then
-    Original := Original.Substring(4);
-  Result := ConcatPaths([TPaths.PatchedResourceDir, Format('%d.asar', [Abs(Original.GetHashCode)])]);
+  Result := ConcatPaths([ExtractFileDir(TFunctions.GetPidExePath(PID)), 'resources\app.asar']);
+  if Result.StartsWith('\\?\', True) then
+    Result := Result.Substring(4);
 end;
 
 class function TFunctions.InjectLibrary(const MMFLauncher: TMMFLauncher; const ProcessHandle, ThreadHandle: THandle): Boolean;
@@ -203,7 +280,7 @@ begin
     SetHandleInformation(ProcessHandle, HANDLE_FLAG_INHERIT, 1);
     SetHandleInformation(ThreadHandle, HANDLE_FLAG_INHERIT, 1);
 
-    Res := StartProcess(InjectorPath, Format('-%s -%s %d -%s %d', [INJECT_ARG, PROCESSHANDLE_ARG, ProcessHandle, THREADHANDLE_ARG, ThreadHandle]), True, False);
+    Res := StartProcess(InjectorPath, '-%s -%s %d -%s %d'.Format([INJECT_ARG, PROCESSHANDLE_ARG, ProcessHandle, THREADHANDLE_ARG, ThreadHandle]), True, False);
     if not Res.Success then
       Exit;
 
@@ -218,7 +295,7 @@ begin
   end else
   begin
     MemSize := Length(LibraryPath) * 2 + 2;
-    TargetMemory := VirtualAllocEx(ProcessHandle, nil, MemSize, MEM_COMMIT or MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    TargetMemory := VirtualAllocEx(ProcessHandle, nil, MemSize, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
     LL := GetProcAddress(GetModuleHandle('kernel32.dll'), 'LoadLibraryW');
     if (LL <> nil) and (TargetMemory <> nil) then
       if WriteProcessMemory(ProcessHandle, TargetMemory, PWideChar(LibraryPath), MemSize, @Written) and (Written = MemSize) then
@@ -298,6 +375,21 @@ begin
     Result := False;
 end;
 
+class function TFunctions.GetPidExePath(PID: Cardinal): string;
+var
+  ProcHandle: THandle;
+begin
+  ProcHandle := OpenProcess(PROCESS_QUERY_INFORMATION, False, Pid);
+  if ProcHandle = 0 then
+    raise Exception.Create('OpenProcess() failed: %d'.Format([GetLastError]));
+
+  try
+    Result := GetExePath(ProcHandle);
+  finally
+    CloseHandle(ProcHandle);
+  end;
+end;
+
 class function TFunctions.GetExePath(ProcessHandle: THandle): string;
 var
   Size: DWORD;
@@ -307,7 +399,7 @@ begin
   SetLength(Buf, Size);
 
   if FQueryFullProcessImageNameW(ProcessHandle, 0, PWideChar(Buf), @Size) = 0 then
-    raise Exception.Create(Format('QueryFullProcessImageNameW() failed: %d', [GetLastError]));
+    raise Exception.Create('QueryFullProcessImageNameW() failed: %d'.Format([GetLastError]));
 
   Result := PWideChar(Buf);
 end;
@@ -359,7 +451,7 @@ begin
   else
     Flags := 0;
 
-  Args := Format('"%s" %s', [ExePath, Args]);
+  Args := '"%s" %s'.Format([ExePath, Args]);
   ApplicationName := ExePath;
   CommandLine := Args;
   Result.Success := CreateProcessW(PWideChar(ApplicationName), PWideChar(CommandLine), nil, nil, InheritHandles, Flags, nil, nil, SI, PI);
@@ -398,10 +490,10 @@ end;
 class procedure TFunctions.CheckWhatsAppInstalled;
 begin
   if not DirectoryExists(TPaths.WhatsAppDir) then
-    raise Exception.Create(Format('WhatsApp installation directory expected at "%s" could not be found. Please install WhatsApp before installing/running %s.', [TPaths.WhatsAppDir, APP_NAME]));
+    raise Exception.Create('WhatsApp installation directory expected at "%s" could not be found. Please install WhatsApp before installing/running %s.'.Format([TPaths.WhatsAppDir, APPNAME]));
 
   if not FileExists(TPaths.WhatsAppExePath) then
-    raise Exception.Create(Format('WhatsApp executable expected at "%s" could not be found. Please install WhatsApp before installing/running %s.', [TPaths.WhatsAppExePath, APP_NAME]));
+    raise Exception.Create('WhatsApp executable expected at "%s" could not be found. Please install WhatsApp before installing/running %s.'.Format([TPaths.WhatsAppExePath, APPNAME]));
 end;
 
 class function TFunctions.GetRunningExePids(const FilePath: string): TCardinalArray;
@@ -412,7 +504,7 @@ var
   Pid, cbNeeded: DWORD;
   ProcHandle: THandle;
 begin
-  SetLength(Result, 0);
+  Result := [];
   SetLength(Pids, PidCount);
   if FEnumProcesses(@Pids[0], SizeOf(DWORD) * PidCount, cbNeeded) then
   begin
@@ -501,16 +593,24 @@ var
       end;
     end;
   end;
+
 begin
-  MMFLauncher := TMMFLauncher.Create;
-  MMFSettings := TMMFSettings.Create;
+  MMFLauncher := nil;
+  MMFSettings := nil;
+
+  if TMMF.Exists(MMFNAME_LAUNCHER) then
+    MMFLauncher := TMMFLauncher.Create(False);
+
+  if ConsiderSettings and TMMF.Exists(MMFNAME_SETTINGS) then
+    MMFSettings := TMMFSettings.Create(False);
+
   try
     Result := False;
 
     SetLength(WindowHandles, 0);
     SetLength(ProcHandles, 0);
 
-    if ConsiderSettings and TMMF.Exists(MMFNAME_SETTINGS) then
+    if Assigned(MMFSettings) then
     begin
       MMFSettings.Read;
       AddWindowOrPid(MMFSettings.SettingsWindowHandle, MMFSettings.SettingsPid);
@@ -522,7 +622,7 @@ begin
       for PID in WhatsAppRunning.PIDs do
         AddWindowOrPid(0, PID);
 
-    if TMMF.Exists(MMFNAME_LAUNCHER) then
+    if Assigned(MMFLauncher) then
     begin
       MMFLauncher.Read;
       if WhatsAppRunning.Success then
@@ -546,12 +646,12 @@ begin
     for Handle in ProcHandles do
       CloseHandle(Handle);
   finally
-    MMFLauncher.Free;
-    MMFSettings.Free;
+    FreeAndNil(MMFLauncher);
+    FreeAndNil(MMFSettings);
   end;
 end;
 
-class procedure TFunctions.FindFiles(const Dir: string; const Pattern: string; const Recurse: Boolean; const FileList: TStringList);
+class procedure TFunctions.FindFiles(const Dir, Pattern: string; const Recurse: Boolean; const FileList: TStringList);
 var
   SR: TSearchRec;
 begin
@@ -654,17 +754,15 @@ class procedure TFunctions.RunUninstall(const Quiet: Boolean);
   end;
 
 var
-  ResFile: string;
   Reg: TRegistry;
-  ResFiles: TStringList;
 begin
   if (not Quiet) and TFunctions.AppsRunning(True) then
   begin
-    if MessageBox(0, Format('Uninstall cannot continue since WhatsApp/%s is currently running.'#13#10'Click "Yes" to close WhatsApp/%s, click "No" to cancel.', [APP_NAME, APP_NAME]), 'Question', MB_ICONQUESTION or MB_YESNO) = IDNO then
+    if MessageBox(0, 'Uninstall cannot continue since WhatsApp/%s is currently running.'#13#10'Click "Yes" to close WhatsApp/%s, click "No" to cancel.'.Format([APPNAME, APPNAME]), 'Question', MB_ICONQUESTION or MB_YESNO) = IDNO then
       Exit;
 
     if not TFunctions.CloseApps(True) then
-      raise Exception.Create(Format('WhatsApp/%s could not be closed', [APP_NAME]));
+      raise Exception.Create('WhatsApp/%s could not be closed'.Format([APPNAME]));
   end;
 
   TFunctions.ModifyShellLinks([ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_32]), ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_64])], TPaths.WhatsAppExePath);
@@ -673,22 +771,9 @@ begin
   UninstallFile(ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_LIBRARYNAME_32]));
   UninstallFile(ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_64]));
   UninstallFile(ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_LIBRARYNAME_64]));
-
   UninstallFile(TPaths.WhatsMissingDir);
 
   UninstallFile(TPaths.SettingsPath);
-
-  ResFiles := TStringList.Create;
-  try
-    TFunctions.FindFiles(TPaths.PatchedResourceDir, '*.asar', False, ResFiles);
-    for ResFile in ResFiles do
-      UninstallFile(ResFile);
-  finally
-    ResFiles.Free;
-  end;
-
-  UninstallFile(TPaths.PatchedResourceDir);
-
   UninstallFile(ExtractFileDir(TPaths.SettingsPath));
 
   Reg := TRegistry.Create;
@@ -698,6 +783,32 @@ begin
   finally
     Reg.Free;
   end;
+end;
+
+class function TFunctions.GetFileVersion(FileName: string): string;
+var
+  VerInfoSize: Integer;
+  VerValueSize: DWord;
+  Dummy: DWord;
+  VerInfo: Pointer;
+  VerValue: PVSFixedFileInfo;
+  FileNameUnicode: UnicodeString;
+begin
+  FileNameUnicode := FileName;
+  VerInfoSize := GetFileVersionInfoSizeW(PWideChar(FileNameUnicode), Dummy);
+  if VerInfoSize <> 0 then
+  begin
+    GetMem(VerInfo, VerInfoSize);
+    try
+      if GetFileVersionInfoW(PWideChar(FileNameUnicode), 0, VerInfoSize, VerInfo) then
+        if VerQueryValue(VerInfo, '\', Pointer(VerValue), VerValueSize) then
+          Exit('%d.%d.%d.%d'.Format([VerValue.dwFileVersionMS shr 16, VerValue.dwFileVersionMS and $FFFF, VerValue.dwFileVersionLS shr 16, VerValue.dwFileVersionLS and $FFFF]));
+    finally
+      FreeMem(VerInfo, VerInfoSize);
+    end;
+  end;
+
+  raise Exception.Create('Error reading file version.');
 end;
 
 end.

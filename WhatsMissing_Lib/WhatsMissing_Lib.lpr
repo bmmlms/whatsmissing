@@ -17,32 +17,39 @@ var
   MMFLauncher: TMMFLauncher;
   Log: TLog;
   Window: TWindow;
-  LauncherHandle, DetachEvent: THandle;
+  LauncherHandle, LauncherTerminatedWaitHandle: THandle;
+  SettingsChangedEvent, SettingsChangedWaitHandle: THandle;
+
+procedure LauncherTerminated(lpParameter: PVOID; TimerOrWaitFired: ByteBool); stdcall;
+begin
+  if Assigned(Log) then
+    Log.Info('Launcher was terminated, exiting');
+  ExitProcess(1);
+end;
+
+procedure SettingsChanged(lpParameter: PVOID; TimerOrWaitFired: ByteBool); stdcall;
+begin
+  Log.Info('Reloading settings');
+
+  TFunctions.UnregisterWait(SettingsChangedWaitHandle);
+
+  if Assigned(Window) then
+    Window.SettingsChanged(MMFLauncher);
+  MMFLauncher.Read;
+
+  while WaitForSingleObject(SettingsChangedEvent, 0) = WAIT_OBJECT_0 do
+    Sleep(100);
+
+  TFunctions.RegisterWaitForSingleObject(@SettingsChangedWaitHandle, SettingsChangedEvent, @SettingsChanged, nil, INFINITE, $00000008);
+end;
 
 procedure MainWindowCreated(Handle: THandle);
 begin
-  Window := TWindow.Create(Handle, MMFLauncher, Log);
-end;
-
-procedure WatchLauncher;
-var
-  Res: Cardinal;
-  WaitHandles: TWOHandleArray;
-begin
-  WaitHandles[0] := LauncherHandle;
-  WaitHandles[1] := DetachEvent;
-  Res := WaitForMultipleObjects(2, @WaitHandles, False, INFINITE);
-  if Res = WAIT_OBJECT_0 then
-  begin
-    if Assigned(Log) then
-      Log.Info('Launcher was terminated, exiting');
-    ExitProcess(1);
-  end;
+  Window := TWindow.Create(Handle, Log);
 end;
 
 procedure ProcessAttach;
 var
-  WatchThreadId: Cardinal;
   ExeName: string;
 begin
   try
@@ -53,33 +60,46 @@ begin
     if (ExeName <> WHATSAPP_EXE) and (ExeName <> UPDATE_EXE) then
       Exit;
 
-    MMFLauncher := TMMFLauncher.Create;
+    try
+      MMFLauncher := TMMFLauncher.Create(False);
+    except
+      Exit;
+    end;
     MMFLauncher.Read;
 
     LauncherHandle := OpenProcess(SYNCHRONIZE, False, MMFLauncher.LauncherPid);
     if LauncherHandle = 0 then
-      raise Exception.Create('Error opening launcher process,');
+      raise Exception.Create('Error opening launcher process');
+
+    TFunctions.RegisterWaitForSingleObject(@LauncherTerminatedWaitHandle, LauncherHandle, @LauncherTerminated, nil, INFINITE, $00000008);
 
     Log := TLog.Create(MMFLauncher.LogFileName);
-    Log.Info(Format('Injected into process %d, executable %s', [GetCurrentProcessId, ExtractFileName(TPaths.ExePath)]));
+    Log.Info('Injected into process %d, executable %s'.Format([GetCurrentProcessId, ExtractFileName(TPaths.ExePath)]));
 
     SendMessage(MMFLauncher.LauncherWindowHandle, WM_CHILD_PROCESS_STARTED, GetCurrentProcessId, 0);
 
-    THooks.Initialize(MMFLauncher, Log);
+    THooks.Initialize(Log);
     @THooks.OnMainWindowCreated := @MainWindowCreated;
 
     if ExeName = WHATSAPP_EXE then
     begin
-      SendMessage(MMFLauncher.LauncherWindowHandle, WM_CHECK_RESOURCES, 0, 0);
+      if FileExists(TFunctions.GetResourceFilePath(GetCurrentProcessId)) then
+        SendMessage(MMFLauncher.LauncherWindowHandle, WM_PATCH_RESOURCES, GetCurrentProcessId, 0);
 
-      DetachEvent := CreateEvent(nil, False, False, nil);
-      CreateThread(nil, 0, @WatchLauncher, nil, 0, WatchThreadId);
+      SettingsChangedEvent := TFunctions.OpenEvent(SYNCHRONIZE, False, EVENTNAME_SETTINGS_CHANGED);
+      TFunctions.RegisterWaitForSingleObject(@SettingsChangedWaitHandle, SettingsChangedEvent, @SettingsChanged, nil, INFINITE, $00000008);
     end;
   except
     on E: Exception do
     begin
+      if not E.Message.EndsWith('.') then
+        E.Message := E.Message + '.';
+
       if Assigned(Log) then
-        Log.Error(Format('Library: %s', [E.Message]));
+        Log.Error('Library: %s'.Format([E.Message]));
+
+      TFunctions.MessageBox(0, E.Message, '%s error'.Format([APPNAME]), MB_ICONERROR);
+
       ExitProcess(1);
     end;
   end;
@@ -87,7 +107,11 @@ end;
 
 procedure ProcessDetach;
 begin
+  TFunctions.UnregisterWait(LauncherTerminatedWaitHandle);
   CloseHandle(LauncherHandle);
+
+  TFunctions.UnregisterWait(SettingsChangedWaitHandle);
+  CloseHandle(SettingsChangedEvent);
 
   if Assigned(Window) then
     Window.Free;
@@ -97,9 +121,6 @@ begin
 
   if Assigned(Log) then
     Log.Free;
-
-  if DetachEvent > 0 then
-    SetEvent(DetachEvent);
 end;
 
 {$R *.res}

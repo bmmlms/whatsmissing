@@ -7,6 +7,7 @@ uses
   Classes,
   Constants,
   Functions,
+  Generics.Collections,
   Log,
   MMF,
   Paths,
@@ -21,15 +22,28 @@ const
   IID_ITaskbarList3: TGUID = '{ea1afb91-9e28-4b86-90e9-9e9f8a5eefaf}';
 
   WM_START = WM_USER + 1;
-  WM_CHECK_RESOURCES_ASYNC = WM_USER + 2;
-  WM_CHECK_RESOURCES_ASYNC_PROGRESS = WM_USER + 3;
-
-  WCRAP_FILES_FOUND = 0;
-  WCRAP_FINISHED = 1;
+  WM_PATCH_RESOURCES_DONE = WM_USER + 2;
 
 type
+  TResourceThreadParameter = record
+    Launcher: Pointer;
+    PID: Cardinal;
+  end;
+  PResourceThreadParameter = ^TResourceThreadParameter;
+
+  TResourceThreadResult = record
+    CssError: Boolean;
+    JsError: Boolean;
+    ResFileHash: Integer;
+    MMF: TMMFResources;
+  end;
+  PResourceThreadResult = ^TResourceThreadResult;
+
+  { TLauncher }
+
   TLauncher = class
   private
+    FExiting: Boolean;
     FLog: TLog;
     FMMFLauncher: TMMFLauncher;
     FHandle: THandle;
@@ -37,16 +51,22 @@ type
     FWindowClass: TWndClassW;
     FProcessMonitor: TProcessMonitor;
     FSettings: TSettings;
+    FResources: TDictionary<Integer, TMMFResources>;
+    FResourceThreadHandle: THandle;
+    FPatchEvent: THandle;
+    FSettingsChangedEvent: THandle;
+    FSettingsChangedWaitHandle: THandle;
+    FLastUsedWhatsAppHash: Integer;
 
+    class procedure SettingsChanged(lpParameter: PVOID; TimerOrWaitFired: ByteBool); stdcall; static;
     class function WndProcWrapper(hwnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall; static;
-    class procedure ThreadCheckResourcesWrapper(const Parameter: Pointer); stdcall; static;
+    class procedure ResourceThreadWrapper(const Parameter: PResourceThreadParameter); stdcall; static;
 
     function WndProc(uMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT;
     procedure WMStart;
-    procedure WMCheckResources;
 
     procedure ProcessMonitorProcessExited(const Sender: TObject; const ExePath: string; const Remaining: Integer);
-    procedure ThreadCheckResources;
+    procedure ResourceThread(const PID: Cardinal);
   public
     constructor Create(const Log: TLog);
     destructor Destroy; override;
@@ -58,26 +78,46 @@ implementation
 
 { TLauncher }
 
+class procedure TLauncher.SettingsChanged(lpParameter: PVOID; TimerOrWaitFired: ByteBool); stdcall;
+var
+  Launcher: TLauncher;
+begin
+  Launcher := TLauncher(lpParameter);
+
+  TFunctions.UnregisterWait(Launcher.FSettingsChangedWaitHandle);
+
+  Sleep(1000);
+
+  ResetEvent(Launcher.FSettingsChangedEvent);
+
+  TFunctions.RegisterWaitForSingleObject(@Launcher.FSettingsChangedWaitHandle, Launcher.FSettingsChangedEvent, @SettingsChanged, Launcher, INFINITE, $00000008);
+end;
+
 class function TLauncher.WndProcWrapper(hwnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 begin
   Result := TLauncher(GetPropW(hwnd, WNDPROC_PROPNAME)).WndProc(uMsg, wParam, lParam);
 end;
 
-class procedure TLauncher.ThreadCheckResourcesWrapper(const Parameter: Pointer);
+class procedure TLauncher.ResourceThreadWrapper(const Parameter: PResourceThreadParameter); stdcall;
 begin
-  TLauncher(Parameter).ThreadCheckResources;
+  TLauncher(Parameter^.Launcher).ResourceThread(Parameter^.PID);
+  Dispose(Parameter);
 end;
 
 constructor TLauncher.Create(const Log: TLog);
 begin
   FLog := Log;
 
-  FMMFLauncher := TMMFLauncher.Create;
+  FMMFLauncher := TMMFLauncher.Create(True);
+  FSettings := TSettings.Create(TPaths.SettingsPath);
+  FResources := TDictionary<Integer, TMMFResources>.Create;
 
   FMMFLauncher.WhatsMissingExe32 := ConcatPaths([TPaths.ExeDir, WHATSMISSING_EXENAME_32]);
   FMMFLauncher.WhatsMissingLib32 := ConcatPaths([TPaths.ExeDir, WHATSMISSING_LIBRARYNAME_32]);
   FMMFLauncher.WhatsMissingExe64 := ConcatPaths([TPaths.ExeDir, WHATSMISSING_EXENAME_64]);
   FMMFLauncher.WhatsMissingLib64 := ConcatPaths([TPaths.ExeDir, WHATSMISSING_LIBRARYNAME_64]);
+
+  FSettings.CopyToMMF(FMMFLauncher);
 
   if (not FileExists(FMMFLauncher.WhatsMissingExe32)) or (not FileExists(FMMFLauncher.WhatsMissingLib32)) then
     raise Exception.Create('Required files not found');
@@ -85,21 +125,43 @@ begin
   if TFunctions.IsWindows64Bit and ((not FileExists(FMMFLauncher.WhatsMissingExe64)) or (not FileExists(FMMFLauncher.WhatsMissingLib64))) then
     raise Exception.Create('Required files not found');
 
-  FSettings := TSettings.Create(TPaths.SettingsPath);
-
   FMMFLauncher.LogFileName := FLog.FileName;
   FMMFLauncher.LauncherPid := GetCurrentProcessId;
   FMMFLauncher.Write;
 
   FProcessMonitor := TProcessMonitor.Create;
   FProcessMonitor.OnProcessExited := ProcessMonitorProcessExited;
+
+  FSettingsChangedEvent := TFunctions.CreateEvent(nil, True, False, EVENTNAME_SETTINGS_CHANGED);
+  TFunctions.RegisterWaitForSingleObject(@FSettingsChangedWaitHandle, FSettingsChangedEvent, PVOID(@SettingsChanged), Self, INFINITE, $00000008);
 end;
 
 destructor TLauncher.Destroy;
+var
+  MMFResources: TMMFResources;
 begin
+  try
+    FMMFLauncher.Read;
+    FSettings.Load;
+    FSettings.LastUsedWhatsAppHash := FLastUsedWhatsAppHash;
+    FSettings.AlwaysOnTop := FMMFLauncher.AlwaysOnTop;
+    FSettings.Save;
+  except
+  end;
+
+  TFunctions.UnregisterWait(FSettingsChangedWaitHandle);
+  CloseHandle(FSettingsChangedEvent);
+
   FMMFLauncher.Free;
   FProcessMonitor.Free;
   FSettings.Free;
+
+  // This crashes - no idea why dictionary values are trashed :(
+  {
+  for MMFResources in FResources.Values do
+    MMFResources.Free;
+  }
+  FResources.Free;
 
   inherited;
 end;
@@ -117,9 +179,9 @@ begin
   if RegisterClassW(FWindowClass) = 0 then
     raise Exception.Create('Error registering window class');
 
-  FHandle := CreateWindowExW(WS_EX_APPWINDOW, FWindowClass.lpszClassName, APP_NAME, 0, Integer.MaxValue, Integer.MaxValue, 0, 0, 0, 0, HInstance, nil);
+  FHandle := CreateWindowExW(WS_EX_APPWINDOW, FWindowClass.lpszClassName, APPNAME, 0, Integer.MaxValue, Integer.MaxValue, 0, 0, 0, 0, HInstance, nil);
   if FHandle = 0 then
-    raise Exception.Create(Format('CreateWindowExW() failed: %d', [GetLastError]));
+    raise Exception.Create('CreateWindowExW() failed: %d'.Format([GetLastError]));
 
   SetPropW(FHandle, WNDPROC_PROPNAME, HANDLE(Self));
 
@@ -130,9 +192,9 @@ begin
 
   SetLastError(0);
   if (SetWindowLongPtrW(FHandle, GWLP_WNDPROC, LONG_PTR(@WndProcWrapper)) = 0) and (GetLastError <> 0) then
-    raise Exception.Create(Format('SetWindowLongPtrW() failed: %d', [GetLastError]));
+    raise Exception.Create('SetWindowLongPtrW() failed: %d'.Format([GetLastError]));
 
-  PostMessage(FHandle, WM_CHECK_RESOURCES_ASYNC, 0, 0);
+  PostMessage(FHandle, WM_START, 0, 0);
 
   while GetMessageW(Msg, 0, 0, 0) do
   begin
@@ -154,7 +216,7 @@ begin
   Res := TFunctions.StartProcess(TPaths.WhatsAppExePath, '', False, True);
   if not Res.Success then
   begin
-    TFunctions.MessageBox(0, 'WhatsApp could not be started.', 'Error', MB_ICONERROR);
+    TFunctions.MessageBox(FHandle, 'WhatsApp could not be started.', '%s error'.Format([APPNAME]), MB_ICONERROR);
     PostQuitMessage(1);
     Exit;
   end;
@@ -167,7 +229,7 @@ begin
   begin
     TerminateProcess(Res.ProcessHandle, 100);
 
-    TFunctions.MessageBox(0, 'Error injecting library.', 'Error', MB_ICONERROR);
+    TFunctions.MessageBox(FHandle, 'Error injecting library.', '%s error'.Format([APPNAME]), MB_ICONERROR);
     PostQuitMessage(1);
     Exit;
   end else
@@ -175,60 +237,62 @@ begin
 
   CloseHandle(Res.ProcessHandle);
   CloseHandle(Res.ThreadHandle);
-end;
 
-procedure TLauncher.WMCheckResources;
-var
-  RP: TResourcePatcher;
-begin
-  FLog.Info('Checking unpatched resources');
-
-  RP := TResourcePatcher.Create(FSettings);
-  try
-    try
-      RP.RunUnpatched;
-    except
-      on E: Exception do
-        FLog.Error(Format('RunUnpatched() failed: %s', [E.Message]));
-    end;
-  finally
-    RP.Free;
-  end;
+  ShowWindow(FHandle, SW_SHOW);
 end;
 
 function TLauncher.WndProc(uMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT;
 var
-  ThreadId: Cardinal;
+  Dummy: DWORD;
+  ResourceFilePath: string;
   TaskbarList: ITaskbarList3;
   WhatsAppExes: TStringList;
+  ThreadParameters: PResourceThreadParameter;
+  ThreadResult: TResourceThreadResult;
 begin
   Result := 0;
 
   case uMsg of
-    WM_CHECK_RESOURCES_ASYNC:
+    WM_PATCH_RESOURCES:
     begin
-      CreateThread(nil, 0, @ThreadCheckResourcesWrapper, Self, 0, ThreadId);
-      Exit;
-    end;
-    WM_CHECK_RESOURCES_ASYNC_PROGRESS:
-    begin
-      if wParam = WCRAP_FILES_FOUND then
-        ShowWindow(FHandle, SW_SHOW)
-      else if wParam = WCRAP_FINISHED then
+      ResourceFilePath := AnsiLowerCaseFileName(TFunctions.GetResourceFilePath(wParam));
+
+      if (not FResources.ContainsKey(ResourceFilePath.GetHashCode)) and (FResourceThreadHandle = 0) then
       begin
-        PostMessage(FHandle, WM_START, 0, 0);
-        ShowWindow(FHandle, SW_HIDE);
+        FPatchEvent := TFunctions.CreateEvent(nil, True, False, TMMFResources.GetEventName(ResourceFilePath));
+
+        FLastUsedWhatsAppHash := ResourceFilePath.GetHashCode;
+
+        New(ThreadParameters);
+        ThreadParameters.Launcher := Self;
+        ThreadParameters.PID := wParam;
+        FResourceThreadHandle := CreateThread(nil, 0, @ResourceThreadWrapper, ThreadParameters, 0, Dummy);
       end;
+
       Exit;
     end;
-    WM_CHECK_RESOURCES:
+    WM_PATCH_RESOURCES_DONE:
     begin
-      WMCheckResources;
+      CloseHandle(FResourceThreadHandle);
+      FResourceThreadHandle := 0;
+
+      SetEvent(FPatchEvent);
+      CloseHandle(FPatchEvent);
+
+      ThreadResult := PResourceThreadResult(wParam)^;
+
+      FResources.Add(ThreadResult.ResFileHash, ThreadResult.MMF);
+
+      if ThreadResult.MMF = nil then
+        TFunctions.MessageBox(FHandle, 'Critical error applying patches.', '%s error'.Format([APPNAME]), MB_ICONERROR)
+      else if ThreadResult.CssError or ThreadResult.JsError then
+        if FSettings.LastUsedWhatsAppHash <> ThreadResult.ResFileHash then
+          TFunctions.MessageBox(FHandle, 'Some patches could not be applied, please update %s.'.Format([APPNAME]), '%s error'.Format([APPNAME]), MB_ICONERROR);
+
       Exit;
     end;
     WM_CHECK_LINKS:
     begin
-      FLog.Info('Checking shortcuts');
       WhatsAppExes := TStringList.Create;
       try
         TFunctions.FindFiles(TPaths.WhatsAppDir, WHATSAPP_EXE, True, WhatsAppExes);
@@ -250,9 +314,15 @@ begin
     end;
     WM_MAINWINDOW_CREATED:
     begin
+      FMMFLauncher.Read;
       FMMFLauncher.WhatsAppGuiPid := lParam;
       FMMFLauncher.WhatsAppWindowHandle := wParam;
       FMMFLauncher.Write;
+      Exit;
+    end;
+    WM_WINDOW_SHOWN:
+    begin
+      ShowWindow(FHandle, SW_HIDE);
       Exit;
     end;
     WM_NOTIFICATION_ICON:
@@ -261,6 +331,15 @@ begin
       PostMessage(FMMFLauncher.WhatsAppWindowHandle, uMsg, wParam, lParam);
       Exit;
     end;
+    WM_EXIT:
+    begin
+      FExiting := True;
+      SendMessage(FHandle, WM_CLOSE, 0, 0);
+      Exit;
+    end;
+    WM_CLOSE:
+      if not FExiting then
+        Exit;
     WM_NCDESTROY:
     begin
       RemovePropW(FHandle, WNDPROC_PROPNAME);
@@ -291,56 +370,53 @@ begin
   if Remaining <= 0 then
   begin
     FLog.Info('No child processes remaining, exiting');
-    SendMessage(FHandle, WM_CLOSE, 0, 0);
+    SendMessage(FHandle, WM_EXIT, 0, 0);
   end;
 end;
 
-procedure TLauncher.ThreadCheckResources;
+procedure TLauncher.ResourceThread(const PID: Cardinal);
 var
+  ResourceFilePath: string;
   RP: TResourcePatcher;
+  MMFResources: TMMFResources;
+  Res: TResourceThreadResult;
 begin
-  FLog.Info('Starting resource patching thread');
+  ResourceFilePath := TFunctions.GetResourceFilePath(PID);
 
-  RP := TResourcePatcher.Create(FSettings);
+  Res.ResFileHash := AnsiLowerCaseFileName(ResourceFilePath).GetHashCode;
+  Res.MMF := nil;
+
+  RP := nil;
+  MMFResources := nil;
   try
+    RP := TResourcePatcher.Create(FSettings, FLog);
     try
-      RP.CleanUp;
-    except
-      on E: Exception do
-        FLog.Error(Format('ThreadCheckResources(): Cleanup failed: %s', [E.Message]));
+      RP.ConsumeFile(ResourceFilePath);
+
+      MMFResources := TMMFResources.Create(ResourceFilePath, True);
+      MMFResources.Write(RP.JSON, RP.Resources, RP.ContentOffset);
+
+      FMMFLauncher.Read;
+      FMMFLauncher.ResourceSettingsChecksum := FSettings.ResourceSettingsChecksum;
+      FMMFLauncher.Write;
+
+      Res.CssError := RP.CssError;
+      Res.JsError := RP.JsError;
+      Res.MMF := MMFResources;
+    finally
+      RP.Free;
     end;
+  except
+    on E: Exception do
+    begin
+      FLog.Error('ThreadPatchResources(): %s'.Format([E.Message]));
 
-    FLog.Info('Cleanup finished, searching for unpatched');
-
-    if FSettings.RebuildResources or RP.ExistsUnpatched then
-      SendMessage(FHandle, WM_CHECK_RESOURCES_ASYNC_PROGRESS, WCRAP_FILES_FOUND, 0);
-
-    FLog.Info('Done, now rebuilding');
-
-    try
-      if FSettings.RebuildResources then
-        RP.RunAll
-      else
-        RP.RunUnpatched;
-    except
-      on E: Exception do
-        FLog.Error(Format('ThreadCheckResources(): Resource patching failed: %s', [E.Message]));
+      if Assigned(MMFResources) then
+        FreeAndNil(MMFResources);
     end;
-
-    FLog.Info('Done');
-
-    FSettings.RebuildResources := False;
-    try
-      FSettings.Save;
-    except
-      on E: Exception do
-        FLog.Error(Format('ThreadCheckResources(): Error saving settings: %s', [E.Message]));
-    end;
-  finally
-    RP.Free;
   end;
 
-  SendMessage(FHandle, WM_CHECK_RESOURCES_ASYNC_PROGRESS, WCRAP_FINISHED, 0);
+  SendMessage(FHandle, WM_PATCH_RESOURCES_DONE, LONG_PTR(@Res), 0);
 end;
 
 end.

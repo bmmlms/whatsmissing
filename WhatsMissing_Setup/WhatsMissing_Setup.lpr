@@ -96,13 +96,13 @@ begin
       Exit;
 
     Reg.WriteString('DisplayIcon', Executable);
-    Reg.WriteString('DisplayName', APP_NAME);
+    Reg.WriteString('DisplayName', APPNAME);
     Reg.WriteString('DisplayVersion', '0.0.1');
     Reg.WriteString('InstallDate', FormatDateTime('yyyyMMdd', Now));
     Reg.WriteString('InstallLocation', ExtractFileDir(Executable));
     Reg.WriteInteger('NoModify', 1);
     Reg.WriteInteger('NoRepair', 1);
-    Reg.WriteString('UninstallString', Format('%s -%s', [Executable, PREPARE_UNINSTALL_ARG]));
+    Reg.WriteString('UninstallString', '%s -%s'.Format([Executable, PREPARE_UNINSTALL_ARG]));
   finally
     Reg.Free;
   end;
@@ -164,17 +164,17 @@ begin
 
     TFunctions.CheckWhatsAppInstalled;
 
-    if TFunctions.MessageBox(0, Format('This will install/update %s.'#13#10'Do you want to continue?', [APP_NAME]), 'Question', MB_ICONQUESTION or MB_YESNO) = IDNO then
+    if TFunctions.MessageBox(0, 'This will install/update %s.'#13#10'Do you want to continue?'.Format([APPNAME]), 'Question', MB_ICONQUESTION or MB_YESNO) = IDNO then
       Exit;
 
     if TFunctions.AppsRunning(True) then
     begin
-      if TFunctions.MessageBox(0, Format('Setup cannot continue since WhatsApp/%s is currently running.'#13#10'Click "Yes" to close WhatsApp/%s, click "No" to cancel.', [APP_NAME, APP_NAME]),
+      if TFunctions.MessageBox(0, 'Setup cannot continue since WhatsApp/%s is currently running.'#13#10'Click "Yes" to close WhatsApp/%s, click "No" to cancel.'.Format([APPNAME, APPNAME]),
         'Question', MB_ICONQUESTION or MB_YESNO) = IDNO then
         Exit;
 
       if not TFunctions.CloseApps(True) then
-        raise Exception.Create(Format('WhatsApp/%s could not be closed', [APP_NAME]));
+        raise Exception.Create('WhatsApp/%s could not be closed'.Format([APPNAME]));
     end;
 
     if not Succeeded(CoInitialize(nil)) then
@@ -201,7 +201,7 @@ begin
       if not E.Message.EndsWith('.') then
         E.Message := E.Message + '.';
 
-      TFunctions.MessageBox(0, PChar(Format('Error installing %s: %s', [APP_NAME, E.Message])), 'Error', MB_ICONERROR);
+      TFunctions.MessageBox(0, 'Error installing %s: %s'.Format([APPNAME, E.Message]), 'Error', MB_ICONERROR);
 
       ExitProcess(1);
     end;

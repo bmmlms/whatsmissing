@@ -18,7 +18,6 @@ type
     FWhatsMissingDir: string;
     FSettingsPath: string;
     FWhatsAppExePath: string;
-    FPatchedResourceDir: string;
     FDesktopDir: string;
     FStartMenuDir: string;
     FUserPinnedDir: string;
@@ -32,7 +31,6 @@ type
     class property WhatsMissingDir: string read FWhatsMissingDir;
     class property SettingsPath: string read FSettingsPath;
     class property WhatsAppExePath: string read FWhatsAppExePath;
-    class property PatchedResourceDir: string read FPatchedResourceDir;
     class property DesktopDir: string read FDesktopDir;
     class property StartMenuDir: string read FStartMenuDir;
     class property UserPinnedDir: string read FUserPinnedDir;
@@ -49,10 +47,9 @@ begin
   FExePath := ParamStr(0);
   FTempDir := TFunctions.GetTempPath;
   FWhatsAppDir := ConcatPaths([TFunctions.GetSpecialFolder(CSIDL_LOCAL_APPDATA), 'WhatsApp']);
-  FWhatsMissingDir := ConcatPaths([TFunctions.GetSpecialFolder(CSIDL_LOCAL_APPDATA), APP_NAME]);
-  FSettingsPath := ConcatPaths([TFunctions.GetSpecialFolder(CSIDL_APPDATA), APP_NAME, 'wm_settings.json']);
+  FWhatsMissingDir := ConcatPaths([TFunctions.GetSpecialFolder(CSIDL_LOCAL_APPDATA), APPNAME]);
+  FSettingsPath := ConcatPaths([TFunctions.GetSpecialFolder(CSIDL_APPDATA), APPNAME, 'settings.json']);
   FWhatsAppExePath := ConcatPaths([TFunctions.GetSpecialFolder(CSIDL_LOCAL_APPDATA), 'WhatsApp', WHATSAPP_EXE]);
-  FPatchedResourceDir := ConcatPaths([TFunctions.GetSpecialFolder(CSIDL_APPDATA), APP_NAME, RESOURCES_DIR_NAME]);
   FDesktopDir := TFunctions.GetSpecialFolder(CSIDL_DESKTOP);
   FStartMenuDir := TFunctions.GetSpecialFolder($000B);
   FUserPinnedDir := ConcatPaths([TFunctions.GetSpecialFolder(CSIDL_APPDATA), 'Microsoft\Internet Explorer\Quick Launch']);
