@@ -34,9 +34,10 @@ const
   WHATSMISSING_LIBRARYNAME_64 = 'whatsmissing-x86_64.dll';
   WHATSAPP_CLASSNAME: PWideChar = 'Chrome_WidgetWin_1';
   WHATSAPP_WINDOWNAME: PWideChar = 'WhatsApp';
+  WHATSAPP_APP_MODEL_ID = 'com.squirrel.WhatsApp.WhatsApp';
 
-  WHATSAPP_EXE = 'whatsapp.exe';
-  UPDATE_EXE = 'update.exe';
+  WHATSAPP_EXE = 'WhatsApp.exe';
+  UPDATE_EXE = 'Update.exe';
   LOGFILE = 'whatsmissing.log';
 
   MMFNAME_LAUNCHER = 'Local\WM_Launcher';

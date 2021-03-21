@@ -238,6 +238,8 @@ begin
   CloseHandle(Res.ProcessHandle);
   CloseHandle(Res.ThreadHandle);
 
+  TFunctions.ModifyAutostartEntry(TFunctions.GetWhatsMissingExePath(FMMFLauncher, TFunctions.IsWindows64Bit));
+
   ShowWindow(FHandle, SW_SHOW);
 end;
 
@@ -361,7 +363,7 @@ end;
 
 procedure TLauncher.ProcessMonitorProcessExited(const Sender: TObject; const ExePath: string; const Remaining: Integer);
 begin
-  if AnsiLowerCaseFileName(ExtractFileName(ExePath)).Equals(UPDATE_EXE) then
+  if AnsiLowerCaseFileName(ExtractFileName(ExePath)).Equals(UPDATE_EXE.ToLower) then
   begin
     FLog.Info('Update process exited, checking shortcuts');
     SendMessage(FHandle, WM_CHECK_LINKS, 0, 0);
@@ -393,7 +395,7 @@ begin
     try
       RP.ConsumeFile(ResourceFilePath);
 
-      MMFResources := TMMFResources.Create(ResourceFilePath, True);
+      MMFResources := TMMFResources.Create(ResourceFilePath, True, SizeOf(RP.JSON.Size) + RP.JSON.Size + SizeOf(RP.Resources.Size) + RP.Resources.Size + SizeOf(Cardinal));
       MMFResources.Write(RP.JSON, RP.Resources, RP.ContentOffset);
 
       FMMFLauncher.Read;

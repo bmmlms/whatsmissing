@@ -124,7 +124,7 @@ type
     class function GetMMFName(ResourceFilePath: string): string; static;
     class function GetEventName(ResourceFilePath: string): string; static;
 
-    constructor Create(const ResourceFilePath: string; const Owner: Boolean);
+    constructor Create(const ResourceFilePath: string; const Owner: Boolean; const Size: DWORD);
     destructor Destroy; override;
 
     procedure Write(const JSON: TMemoryStream; const Resources: TMemoryStream; const ContentOffset: Cardinal); reintroduce;
@@ -171,7 +171,7 @@ begin
     InitSecurityAttributes(@SA, @SD);
     FHandle := TFunctions.CreateFileMapping(INVALID_HANDLE_VALUE, @SA, PAGE_READWRITE, 0, Size, FName);
   end else
-    FHandle := TFunctions.OpenFileMapping(FILE_MAP_ALL_ACCESS, False, FName);
+    FHandle := TFunctions.OpenFileMapping(FILE_MAP_READ or FILE_MAP_WRITE, False, FName);
 
   try
     FMutex := TFunctions.CreateMutex(nil, False, Name + 'Mutex');
@@ -207,13 +207,13 @@ var
 begin
   WaitForSingleObject(FMutex, INFINITE);
   try
-    Mem := MapViewOfFile(FHandle, FILE_MAP_READ, 0, 0, FSize);
+    Mem := MapViewOfFile(FHandle, FILE_MAP_READ, 0, 0, 0);
     if not Assigned(Mem) then
       raise Exception.Create('MapViewOfFile() failed: %d'.Format([GetLastError]));
 
     MS := TMMFStream.Create;
     try
-      MS.SetPointer(Mem, FSize);
+      MS.SetPointer(Mem, IfThen<PtrInt>(FSize = 0, MaxInt, FSize));
       ReadStream(MS);
     finally
       MS.Free;
@@ -232,7 +232,7 @@ var
 begin
   WaitForSingleObject(FMutex, INFINITE);
   try
-    Mem := MapViewOfFile(FHandle, FILE_MAP_WRITE, 0, 0, FSize);
+    Mem := MapViewOfFile(FHandle, FILE_MAP_WRITE, 0, 0, 0);
     if not Assigned(Mem) then
       raise Exception.Create('MapViewOfFile() failed: %d'.Format([GetLastError]));
 
@@ -275,111 +275,73 @@ end;
 
 procedure TMMFLauncher.ReadStream(const MS: TMemoryStream);
 var
+  Len: UInt16;
   i: Integer;
-  StrLength, Len: UInt16;
   Str: string;
   UI64: UInt64;
 begin
-  MS.ReadBuffer(FLauncherPid, SizeOf(FLauncherPid));
-  MS.ReadBuffer(FLauncherWindowHandle, SizeOf(FLauncherWindowHandle));
-  MS.ReadBuffer(FWhatsAppGuiPid, SizeOf(FWhatsAppGuiPid));
-  MS.ReadBuffer(FWhatsAppWindowHandle, SizeOf(FWhatsAppWindowHandle));
-  MS.ReadBuffer(FResourceSettingsChecksum, SizeOf(FResourceSettingsChecksum));
+  FLauncherPid := MS.ReadWord;
+  FLauncherWindowHandle := MS.ReadQWord;
+  FWhatsAppGuiPid := MS.ReadDWord;
+  FWhatsAppWindowHandle := MS.ReadQWord;
+  FResourceSettingsChecksum := MS.ReadWord;
 
-  MS.ReadBuffer(StrLength, SizeOf(StrLength));
-  SetLength(FLogFileName, StrLength);
-  MS.ReadBuffer(FLogFileName[1], StrLength);
+  FLogFileName := MS.ReadAnsiString;
+  FWhatsMissingExe32 := MS.ReadAnsiString;
+  FWhatsMissingLib32 := MS.ReadAnsiString;
+  FWhatsMissingExe64 := MS.ReadAnsiString;
+  FWhatsMissingLib64 := MS.ReadAnsiString;
 
-  MS.ReadBuffer(StrLength, SizeOf(StrLength));
-  SetLength(FWhatsMissingExe32, StrLength);
-  MS.ReadBuffer(FWhatsMissingExe32[1], StrLength);
-
-  MS.ReadBuffer(StrLength, SizeOf(StrLength));
-  SetLength(FWhatsMissingLib32, StrLength);
-  MS.ReadBuffer(FWhatsMissingLib32[1], StrLength);
-
-  MS.ReadBuffer(StrLength, SizeOf(StrLength));
-  SetLength(FWhatsMissingExe64, StrLength);
-  MS.ReadBuffer(FWhatsMissingExe64[1], StrLength);
-
-  MS.ReadBuffer(StrLength, SizeOf(StrLength));
-  SetLength(FWhatsMissingLib64, StrLength);
-  MS.ReadBuffer(FWhatsMissingLib64[1], StrLength);
-
-  MS.ReadBuffer(Len, SizeOf(UInt16));
+  Len := MS.ReadWord;
   for i := 0 to Len - 1 do
   begin
-    MS.ReadBuffer(StrLength, SizeOf(StrLength));
-    SetLength(Str, StrLength);
-    MS.ReadBuffer(Str[1], StrLength);
-
-    MS.ReadBuffer(UI64, SizeOf(UI64));
-
+    Str := MS.ReadAnsiString;
+    UI64 := MS.ReadQWord;
     FJIDMessageTimes.AddOrSetValue(Str, UI64);
   end;
 
-  MS.ReadBuffer(FShowNotificationIcon, SizeOf(FShowNotificationIcon));
-  MS.ReadBuffer(FIndicateNewMessages, SizeOf(FIndicateNewMessages));
-  MS.ReadBuffer(FIndicatorColor, SizeOf(FIndicatorColor));
-  MS.ReadBuffer(FHideMaximize, SizeOf(FHideMaximize));
-  MS.ReadBuffer(FAlwaysOnTop, SizeOf(FAlwaysOnTop));
-  MS.ReadBuffer(FSuppressPresenceAvailable, SizeOf(FSuppressPresenceAvailable));
-  MS.ReadBuffer(FSuppressPresenceComposing, SizeOf(FSuppressPresenceComposing));
-  MS.ReadBuffer(FSuppressConsecutiveNotificationSounds, SizeOf(FSuppressConsecutiveNotificationSounds));
+  FShowNotificationIcon := Boolean(MS.ReadByte);
+  FIndicateNewMessages := Boolean(MS.ReadByte);
+  FIndicatorColor := MS.ReadDWord;
+  FHideMaximize := Boolean(MS.ReadByte);
+  FAlwaysOnTop := Boolean(MS.ReadByte);
+
+  FSuppressPresenceAvailable := Boolean(MS.ReadByte);
+  FSuppressPresenceComposing := Boolean(MS.ReadByte);
+  FSuppressConsecutiveNotificationSounds := Boolean(MS.ReadByte);
 end;
 
 procedure TMMFLauncher.WriteStream(const MS: TMemoryStream);
 var
-  StrLength, Len: UInt16;
-  Str: string;
-  UI64: UInt64;
+  Pair: TPair<string, UInt64>;
 begin
-  MS.WriteBuffer(FLauncherPid, SizeOf(FLauncherPid));
-  MS.WriteBuffer(FLauncherWindowHandle, SizeOf(FLauncherWindowHandle));
-  MS.WriteBuffer(FWhatsAppGuiPid, SizeOf(FWhatsAppGuiPid));
-  MS.WriteBuffer(FWhatsAppWindowHandle, SizeOf(FWhatsAppWindowHandle));
-  MS.WriteBuffer(FResourceSettingsChecksum, SizeOf(FResourceSettingsChecksum));
+  MS.WriteWord(FLauncherPid);
+  MS.WriteQWord(FLauncherWindowHandle);
+  MS.WriteDWord(FWhatsAppGuiPid);
+  MS.WriteQWord(FWhatsAppWindowHandle);
+  MS.WriteWord(FResourceSettingsChecksum);
 
-  StrLength := FLogFileName.Length;
-  MS.WriteBuffer(StrLength, SizeOf(StrLength));
-  MS.WriteBuffer(FLogFileName[1], StrLength);
+  MS.WriteAnsiString(FLogFileName);
+  MS.WriteAnsiString(FWhatsMissingExe32);
+  MS.WriteAnsiString(FWhatsMissingLib32);
+  MS.WriteAnsiString(FWhatsMissingExe64);
+  MS.WriteAnsiString(FWhatsMissingLib64);
 
-  StrLength := FWhatsMissingExe32.Length;
-  MS.WriteBuffer(StrLength, SizeOf(StrLength));
-  MS.WriteBuffer(FWhatsMissingExe32[1], StrLength);
-
-  StrLength := FWhatsMissingLib32.Length;
-  MS.WriteBuffer(StrLength, SizeOf(StrLength));
-  MS.WriteBuffer(FWhatsMissingLib32[1], StrLength);
-
-  StrLength := FWhatsMissingExe64.Length;
-  MS.WriteBuffer(StrLength, SizeOf(StrLength));
-  MS.WriteBuffer(FWhatsMissingExe64[1], StrLength);
-
-  StrLength := FWhatsMissingLib64.Length;
-  MS.WriteBuffer(StrLength, SizeOf(StrLength));
-  MS.WriteBuffer(FWhatsMissingLib64[1], StrLength);
-
-  Len := FJIDMessageTimes.Count;
-  MS.WriteBuffer(Len, SizeOf(Len));
-  for Str in FJIDMessageTimes.Keys do
+  MS.WriteWord(FJIDMessageTimes.Count);
+  for Pair in FJIDMessageTimes do
   begin
-    StrLength := Str.Length;
-    MS.WriteBuffer(StrLength, SizeOf(StrLength));
-    MS.WriteBuffer(Str[1], StrLength);
-
-    UI64 := FJIDMessageTimes[Str];
-    MS.WriteBuffer(UI64, SizeOf(UI64));
+    MS.WriteAnsiString(Pair.Key);
+    MS.WriteQWord(Pair.Value);
   end;
 
-  MS.WriteBuffer(FShowNotificationIcon, SizeOf(FShowNotificationIcon));
-  MS.WriteBuffer(FIndicateNewMessages, SizeOf(FIndicateNewMessages));
-  MS.WriteBuffer(FIndicatorColor, SizeOf(FIndicatorColor));
-  MS.WriteBuffer(FHideMaximize, SizeOf(FHideMaximize));
-  MS.WriteBuffer(FAlwaysOnTop, SizeOf(FAlwaysOnTop));
-  MS.WriteBuffer(FSuppressPresenceAvailable, SizeOf(FSuppressPresenceAvailable));
-  MS.WriteBuffer(FSuppressPresenceComposing, SizeOf(FSuppressPresenceComposing));
-  MS.WriteBuffer(FSuppressConsecutiveNotificationSounds, SizeOf(FSuppressConsecutiveNotificationSounds));
+  MS.WriteByte(Byte(FShowNotificationIcon));
+  MS.WriteByte(Byte(FIndicateNewMessages));
+  MS.WriteDWord(FIndicatorColor);
+  MS.WriteByte(Byte(FHideMaximize));
+  MS.WriteByte(Byte(FAlwaysOnTop));
+  MS.WriteByte(Byte(FSuppressPresenceAvailable));
+  MS.WriteByte(Byte(FSuppressPresenceComposing));
+  MS.WriteByte(Byte(FSuppressConsecutiveNotificationSounds));
 end;
 
 { TMMFSettings }
@@ -391,14 +353,14 @@ end;
 
 procedure TMMFSettings.ReadStream(const MS: TMemoryStream);
 begin
-  MS.ReadBuffer(FSettingsPid, SizeOf(FSettingsPid));
-  MS.ReadBuffer(FSettingsWindowHandle, SizeOf(FSettingsWindowHandle));
+  FSettingsPid := MS.ReadDWord;
+  FSettingsWindowHandle := MS.ReadQWord;
 end;
 
 procedure TMMFSettings.WriteStream(const MS: TMemoryStream);
 begin
-  MS.WriteBuffer(FSettingsPid, SizeOf(FSettingsPid));
-  MS.WriteBuffer(FSettingsWindowHandle, SizeOf(FSettingsWindowHandle));
+  MS.WriteDWord(FSettingsPid);
+  MS.WriteQWord(FSettingsWindowHandle);
 end;
 
 { TMMFResources }
@@ -413,9 +375,9 @@ begin
   Result := EVENTNAME_RESOURCES.Format([AnsiLowerCaseFileName(ResourceFilePath).GetHashCode]);
 end;
 
-constructor TMMFResources.Create(const ResourceFilePath: string; const Owner: Boolean);
+constructor TMMFResources.Create(const ResourceFilePath: string; const Owner: Boolean; const Size: DWORD);
 begin
-  inherited Create(GetMMFName(ResourceFilePath), Owner, 1024 * 1024 * 5);
+  inherited Create(GetMMFName(ResourceFilePath), Owner, Size);
 
   FJSON := TMemoryStream.Create;
   FResources := TMemoryStream.Create;
@@ -442,33 +404,25 @@ begin
 end;
 
 procedure TMMFResources.ReadStream(const MS: TMemoryStream);
-var
-  StreamLen: Cardinal;
 begin
-  MS.ReadBuffer(FContentOffset, SizeOf(FContentOffset));
+  FContentOffset := MS.ReadDWord;
 
   FJSON.Clear;
-  MS.ReadBuffer(StreamLen, SizeOf(StreamLen));
-  FJSON.CopyFrom(MS, StreamLen);
+  FJSON.CopyFrom(MS, MS.ReadQWord);
 
   FResources.Clear;
-  MS.ReadBuffer(StreamLen, SizeOf(StreamLen));
-  FResources.CopyFrom(MS, StreamLen);
+  FResources.CopyFrom(MS, MS.ReadQWord);
 end;
 
 procedure TMMFResources.WriteStream(const MS: TMemoryStream);
-var
-  StreamLen: Cardinal;
 begin
-  MS.WriteBuffer(FContentOffset, SizeOf(FContentOffset));
+  MS.WriteDWord(FContentOffset);
 
-  StreamLen := FJSON.Size;
-  MS.WriteBuffer(StreamLen, SizeOf(StreamLen));
+  MS.WriteQWord(FJSON.Size);
   FJSON.Position := 0;
   MS.CopyFrom(FJSON, 0);
 
-  StreamLen := FResources.Size;
-  MS.WriteBuffer(StreamLen, SizeOf(StreamLen));
+  MS.WriteQWord(FResources.Size);
   FResources.Position := 0;
   MS.CopyFrom(FResources, 0);
 end;

@@ -97,12 +97,13 @@ begin
 
     Reg.WriteString('DisplayIcon', Executable);
     Reg.WriteString('DisplayName', APPNAME);
-    Reg.WriteString('DisplayVersion', '0.0.1');
+    Reg.WriteString('DisplayVersion', TFunctions.GetFileVersion(TPaths.ExePath));
     Reg.WriteString('InstallDate', FormatDateTime('yyyyMMdd', Now));
     Reg.WriteString('InstallLocation', ExtractFileDir(Executable));
     Reg.WriteInteger('NoModify', 1);
     Reg.WriteInteger('NoRepair', 1);
     Reg.WriteString('UninstallString', '%s -%s'.Format([Executable, PREPARE_UNINSTALL_ARG]));
+    Reg.WriteString('Publisher', 'bmmlms');
   finally
     Reg.Free;
   end;
@@ -134,7 +135,7 @@ begin
     if not ExtractResource('LIB_64', ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_LIBRARYNAME_64])) then
       raise Exception.Create('Error installing library');
   end else
-    WhatsMissingExecutable := ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_64]);
+    WhatsMissingExecutable := ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_32]);
 
   WhatsAppExes := TStringList.Create;
   try

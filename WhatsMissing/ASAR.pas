@@ -58,6 +58,8 @@ type
     function WriteJSON(const Parent: TJSONObject): TJSONObject;
     function FindEntry(const Name: string; T: TClass): TASAREntry;
     procedure RemoveFile(const F: TASARFile);
+
+    property Children: TList<TASAREntry> read FChildren;
   end;
 
   TASARFile = class(TASAREntry)
@@ -163,15 +165,15 @@ begin
   if Assigned(FData) then
     FData.Free;
 
-  Stream.ReadBuffer(PickleLen, SizeOf(UInt32)); // Length of first pickle
-  Stream.ReadBuffer(IndexLen, SizeOf(UInt32));  // Value of first pickle
-  Stream.ReadBuffer(PickleLen, SizeOf(UInt32)); // Length of second pickle
-  Stream.ReadBuffer(JSONLen, SizeOf(UInt32));   // Length of JSON data
+  PickleLen := Stream.ReadDWord; // Length of first pickle
+  IndexLen := Stream.ReadDWord;  // Value of first pickle
+  PickleLen := Stream.ReadDWord; // Length of second pickle
+  JSONLen := Stream.ReadDWord;   // Length of JSON data
 
   FContentOffset := SizeOf(UInt32) * 2 + IndexLen;
 
   SetLength(JSONString, JSONLen);
-  Stream.Read(JSONString[1], JSONLen);
+  Stream.ReadBuffer(JSONString[1], JSONLen);
   FData := TJSONObject(GetJSON(JSONString, False));
 end;
 
@@ -184,22 +186,18 @@ begin
   JSONString := FData.AsJSON;
 
   // Length of first pickle
-  WriteInt := 4;
-  Stream.Write(WriteInt, SizeOf(WriteInt));
+  Stream.WriteDWord(4);
 
   // Value of first pickle
-  WriteInt := 4 + 4 + JSONString.Length;
-  Stream.Write(WriteInt, SizeOf(WriteInt));
+  Stream.WriteDWord(4 + 4 + JSONString.Length);
 
   // Length of second pickle
-  WriteInt := 4 + JSONString.Length;
-  Stream.Write(WriteInt, SizeOf(WriteInt));
+  Stream.WriteDWord(4 + JSONString.Length);
 
   // Length of JSON data
-  WriteInt := JSONString.Length;
-  Stream.Write(WriteInt, SizeOf(WriteInt));
+  Stream.WriteDWord(JSONString.Length);
 
-  Stream.Write(JSONString[1], JSONString.Length);
+  Stream.WriteBuffer(JSONString[1], JSONString.Length);
 end;
 
 { TASAREntry }

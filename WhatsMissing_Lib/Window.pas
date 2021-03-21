@@ -236,10 +236,6 @@ begin
     WM_SETFOCUS:
     begin
       PostMessage(FHandle, WM_CHAT, WC_READ, 0);
-
-      FMMFLauncher.Read;
-      FMMFLauncher.JIDMessageTimes.Clear;
-      FMMFLauncher.Write;
     end;
     WM_EXIT:
     begin
@@ -252,6 +248,7 @@ begin
     end;
     WM_NCDESTROY:
     begin
+      FMMFLauncher.Read;
       FMMFLauncher.AlwaysOnTop := FAlwaysOnTop;
       FMMFLauncher.Write;
       FMMFLauncher.Free;
@@ -639,6 +636,10 @@ end;
 procedure TWindow.ChatMessagesRead;
 begin
   FNewMessages := False;
+
+  FMMFLauncher.Read;
+  FMMFLauncher.JIDMessageTimes.Clear;
+  FMMFLauncher.Write;
 
   UpdateNotificationIcon;
 end;

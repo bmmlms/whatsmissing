@@ -37,7 +37,7 @@ type
     property ID: Integer read FID;
     property Description: string read FDescription;
     property ColorCustom: TColor read FColorCustom write FColorCustom;
-    property ColorImmersive: TImmersiveColorType read FColorImmersive write FColorImmersive;
+    property ColorImmersive: TImmersiveColorType read FColorImmersive;
     property ColorType: TColorType read FColorType write FColorType;
   end;
 
@@ -260,21 +260,17 @@ end;
 
 procedure TSettings.CopyToMMF(MMF: TMMFLauncher);
 begin
-  MMF.ShowNotificationIcon := ShowNotificationIcon;
-  MMF.IndicateNewMessages := IndicateNewMessages;
+  MMF.ShowNotificationIcon := FShowNotificationIcon;
+  MMF.IndicateNewMessages := FIndicateNewMessages;
   MMF.IndicatorColor := FIndicatorColor.GetColor(caNone);
-  MMF.HideMaximize := HideMaximize;
-  MMF.AlwaysOnTop := AlwaysOnTop;
-  MMF.SuppressPresenceAvailable := SuppressPresenceAvailable;
+  MMF.HideMaximize := FHideMaximize;
+  MMF.AlwaysOnTop := FAlwaysOnTop;
+  MMF.SuppressPresenceAvailable := FSuppressPresenceAvailable;
   MMF.SuppressPresenceComposing := FSuppressPresenceComposing;
-  MMF.SuppressConsecutiveNotificationSounds := SuppressConsecutiveNotificationSounds;
+  MMF.SuppressConsecutiveNotificationSounds := FSuppressConsecutiveNotificationSounds;
 end;
 
-
-
 procedure TSettings.Reset;
-const
-  clDefault = $20000000;
 var
   ColorSetting: TColorSetting;
 begin

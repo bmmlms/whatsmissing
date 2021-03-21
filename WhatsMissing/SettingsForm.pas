@@ -180,58 +180,74 @@ var
   SettingsChangedEvent: THandle;
   Res: TStartProcessRes;
   MMFLauncher: TMMFLauncher;
+  SaveSettings: TSettings;
+  ColorSetting, SaveColorSetting: TColorSetting;
 begin
-  FSettings.ShowNotificationIcon := chkShowNotificationIcon.Checked;
-  FSettings.IndicateNewMessages := chkIndicateNewMessages.Checked;
-  FSettings.HideMaximize := chkHideMaximize.Checked;
-  FSettings.SuppressPresenceAvailable := chkSuppressPresenceAvailable.Checked;
-  FSettings.SuppressPresenceComposing := chkSuppressPresenceComposing.Checked;
-  FSettings.SuppressConsecutiveNotificationSounds := chkSuppressConsecutiveNotificationSounds.Checked;
-
+  SaveSettings := TSettings.Create(TPaths.SettingsPath);
   try
-    FSettings.Save;
-  except
-    TFunctions.MessageBox(Handle, 'Error saving settings.', 'Error', MB_ICONERROR);
-    Exit;
-  end;
-
-  try
-    if not TMMF.Exists(MMFNAME_LAUNCHER) then
-      Exit;
-
-    MMFLauncher := TMMFLauncher.Create(False);
-    SettingsChangedEvent := TFunctions.OpenEvent(EVENT_MODIFY_STATE, False, EVENTNAME_SETTINGS_CHANGED);
-    try
-      MMFLauncher.Read;
-      FSettings.CopyToMMF(MMFLauncher);
-      MMFLauncher.Write;
-
-      SetEvent(SettingsChangedEvent);
-
-      if (MMFLauncher.ResourceSettingsChecksum > 0) and (FSettings.ResourceSettingsChecksum <> MMFLauncher.ResourceSettingsChecksum) and TFunctions.AppsRunning(False) then
-      begin
-        if TFunctions.MessageBox(Handle, 'WhatsApp needs to be restarted in order to apply new settings. Do you want to restart WhatsApp now?', 'Question', MB_ICONQUESTION or MB_YESNO or MB_DEFBUTTON1) = idNo then
-          Exit;
-
-        if not TFunctions.CloseApps(False) then
+    for ColorSetting in FSettings.ColorSettings do
+      for SaveColorSetting in SaveSettings.ColorSettings do
+        if ColorSetting.ID = SaveColorSetting.ID then
         begin
-          TFunctions.MessageBox(Handle, 'WhatsApp could not be closed. Please restart WhatsApp manually.', 'Error', MB_ICONERROR);
-          Exit;
+          SaveColorSetting.ColorCustom := ColorSetting.ColorCustom;
+          SaveColorSetting.ColorType := ColorSetting.ColorType;
+          Break;
         end;
 
-        Res := TFunctions.StartProcess(TPaths.ExePath, '', False, False);
-        if not Res.Success then
-          TFunctions.MessageBox(Handle, 'Error restarting WhatsApp.', 'Error', MB_ICONERROR);
+    SaveSettings.ShowNotificationIcon := chkShowNotificationIcon.Checked;
+    SaveSettings.IndicateNewMessages := chkIndicateNewMessages.Checked;
+    SaveSettings.HideMaximize := chkHideMaximize.Checked;
+    SaveSettings.SuppressPresenceAvailable := chkSuppressPresenceAvailable.Checked;
+    SaveSettings.SuppressPresenceComposing := chkSuppressPresenceComposing.Checked;
+    SaveSettings.SuppressConsecutiveNotificationSounds := chkSuppressConsecutiveNotificationSounds.Checked;
 
-        CloseHandle(Res.ProcessHandle);
-        CloseHandle(Res.ThreadHandle);
+    try
+      SaveSettings.Save;
+    except
+      TFunctions.MessageBox(Handle, 'Error saving settings.', 'Error', MB_ICONERROR);
+      Exit;
+    end;
+
+    try
+      if not TMMF.Exists(MMFNAME_LAUNCHER) then
+        Exit;
+
+      MMFLauncher := TMMFLauncher.Create(False);
+      SettingsChangedEvent := TFunctions.OpenEvent(EVENT_MODIFY_STATE, False, EVENTNAME_SETTINGS_CHANGED);
+      try
+        MMFLauncher.Read;
+        SaveSettings.CopyToMMF(MMFLauncher);
+        MMFLauncher.Write;
+
+        SetEvent(SettingsChangedEvent);
+
+        if (MMFLauncher.ResourceSettingsChecksum > 0) and (SaveSettings.ResourceSettingsChecksum <> MMFLauncher.ResourceSettingsChecksum) and TFunctions.AppsRunning(False) then
+        begin
+          if TFunctions.MessageBox(Handle, 'WhatsApp needs to be restarted in order to apply new settings. Do you want to restart WhatsApp now?', 'Question', MB_ICONQUESTION or MB_YESNO or MB_DEFBUTTON1) = idNo then
+            Exit;
+
+          if not TFunctions.CloseApps(False) then
+          begin
+            TFunctions.MessageBox(Handle, 'WhatsApp could not be closed. Please restart WhatsApp manually.', 'Error', MB_ICONERROR);
+            Exit;
+          end;
+
+          Res := TFunctions.StartProcess(TPaths.ExePath, '', False, False);
+          if not Res.Success then
+            TFunctions.MessageBox(Handle, 'Error restarting WhatsApp.', 'Error', MB_ICONERROR);
+
+          CloseHandle(Res.ProcessHandle);
+          CloseHandle(Res.ThreadHandle);
+        end;
+      finally
+        MMFLauncher.Free;
+        CloseHandle(SettingsChangedEvent);
       end;
     finally
-      MMFLauncher.Free;
-      CloseHandle(SettingsChangedEvent);
+      Close;
     end;
   finally
-    Close;
+    SaveSettings.Free;
   end;
 end;
 

@@ -12,6 +12,7 @@ uses
   Log,
   MMF,
   Paths,
+  Settings,
   SettingsForm,
   SysUtils,
   Windows;
@@ -104,8 +105,8 @@ var
   IsInject, IsSettings, IsPrepareUninstall, IsUninstall, IsLauncher: Boolean;
   StartProcessRes: TStartProcessRes;
   ProcHandle: THandle;
-  Log: TLog;
   UninstallerPath, ParentHandleStr: string;
+  Log: TLog;
 begin
   IsMultiThread := True;
 
@@ -164,7 +165,7 @@ begin
     begin
       TFunctions.CheckWhatsAppInstalled;
 
-      TFunctions.SetCurrentProcessExplicitAppUserModelID('com.squirrel.WhatsApp.WhatsApp');
+      TFunctions.SetCurrentProcessExplicitAppUserModelID(WHATSAPP_APP_MODEL_ID);
 
       if IsLauncher then
       begin

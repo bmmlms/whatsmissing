@@ -100,10 +100,13 @@ type
     class procedure ModifyShellLink(const LinkFile: string; const ExecutablePath: string); static;
     class procedure ModifyShellLinks(const FromCurrentPaths: array of string; const NewPath: string); static;
     class procedure RunUninstall(const Quiet: Boolean); static;
-    class function GetFileVersion(FileName: string): string; static;
+    class procedure ModifyAutostartEntry(const Value: string); static;
+    class function GetWhatsAppAutostartCommand: string; static;
+    class function GetFileVersion(const FileName: string): string; static;
+
+    class procedure SetCurrentProcessExplicitAppUserModelID(AppID: string); static;
 
     class property AllowSetForegroundWindow: TAllowSetForegroundWindow read FAllowSetForegroundWindow;
-    class property SetCurrentProcessExplicitAppUserModelID: TSetCurrentProcessExplicitAppUserModelID read FSetCurrentProcessExplicitAppUserModelID;
   end;
 
 implementation
@@ -334,7 +337,7 @@ begin
     Result := False;
   SysFreeString(Variant.pbstrVal);
 
-  Variant.bstrVal := SysAllocString(PWideChar('com.squirrel.WhatsApp.WhatsApp'));
+  Variant.bstrVal := SysAllocString(PWideChar(WHATSAPP_APP_MODEL_ID));
   if Failed(PS.SetValue(@PKEY_AppUserModel_ID, @Variant)) then
     Result := False;
   SysFreeString(Variant.pbstrVal);
@@ -780,12 +783,35 @@ begin
   try
     Reg.RootKey := HKEY_CURRENT_USER;
     Reg.DeleteKey('SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\WhatsMissing');
+
+    if Reg.OpenKey('SOFTWARE\Microsoft\Windows\CurrentVersion\Run', False) and Reg.ValueExists(WHATSAPP_APP_MODEL_ID) then
+      Reg.WriteString(WHATSAPP_APP_MODEL_ID, GetWhatsAppAutostartCommand);
   finally
     Reg.Free;
   end;
 end;
 
-class function TFunctions.GetFileVersion(FileName: string): string;
+class procedure TFunctions.ModifyAutostartEntry(const Value: string);
+var
+  Reg: TRegistry;
+begin
+  Reg := TRegistry.Create;
+
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey('SOFTWARE\Microsoft\Windows\CurrentVersion\Run', False) and Reg.ValueExists(WHATSAPP_APP_MODEL_ID) then
+      Reg.WriteString(WHATSAPP_APP_MODEL_ID, Value);
+  finally
+    Reg.Free;
+  end;
+end;
+
+class function TFunctions.GetWhatsAppAutostartCommand: string;
+begin
+  Result := '%s --processStart "%s"'.Format([ConcatPaths([TPaths.WhatsAppDir, UPDATE_EXE]), WHATSAPP_EXE]);
+end;
+
+class function TFunctions.GetFileVersion(const FileName: string): string;
 var
   VerInfoSize: Integer;
   VerValueSize: DWord;
@@ -809,6 +835,15 @@ begin
   end;
 
   raise Exception.Create('Error reading file version.');
+end;
+
+class procedure TFunctions.SetCurrentProcessExplicitAppUserModelID(AppID: string);
+var
+  AppIDUnicode: UnicodeString;
+begin
+  AppIDUnicode := AppID;
+  if FSetCurrentProcessExplicitAppUserModelID(PWideChar(AppIDUnicode)) <> S_OK then
+    raise Exception.Create('SetCurrentProcessExplicitAppUserModelID() failed');
 end;
 
 end.

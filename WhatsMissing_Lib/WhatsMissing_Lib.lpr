@@ -57,13 +57,20 @@ begin
     TPaths.Init;
 
     ExeName := AnsiLowerCaseFileName(ExtractFileName(TPaths.ExePath));
-    if (ExeName <> WHATSAPP_EXE) and (ExeName <> UPDATE_EXE) then
+    if (ExeName <> WHATSAPP_EXE.ToLower) and (ExeName <> UPDATE_EXE.ToLower) then
       Exit;
 
     try
       MMFLauncher := TMMFLauncher.Create(False);
     except
       Exit;
+      {
+      on e: exception do
+      TFunctions.MessageBox(0, GetCurrentProcessId.ToString, e.Message, 0 );
+
+      Exit;
+      end;
+      }
     end;
     MMFLauncher.Read;
 
@@ -81,7 +88,7 @@ begin
     THooks.Initialize(Log);
     @THooks.OnMainWindowCreated := @MainWindowCreated;
 
-    if ExeName = WHATSAPP_EXE then
+    if ExeName = WHATSAPP_EXE.ToLower then
     begin
       if FileExists(TFunctions.GetResourceFilePath(GetCurrentProcessId)) then
         SendMessage(MMFLauncher.LauncherWindowHandle, WM_PATCH_RESOURCES, GetCurrentProcessId, 0);

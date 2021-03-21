@@ -14,14 +14,45 @@ uses
   Paths,
   RegExpr,
   Settings,
-  SysUtils;
+  SysUtils,
+  Windows;
 
 type
+  TThreadResourcePatchInfo = record
+    Setting: TResourceColorSetting;
+    Patch: TResourceColorSettingPatch;
+    Matches: LongInt;
+  end;
+  PThreadResourcePatchInfo = ^TThreadResourcePatchInfo;
 
   { TResourcePatcher }
 
   TResourcePatcher = class
   private
+    type
+    TThreadPatchInfo = record
+      Search: string;
+      Replace: string;
+      ReplaceFlags: TReplaceFlags;
+      IsRegEx: Boolean;
+      Target: TTarget;
+      Matches: LongInt;
+    end;
+    PThreadPatchInfo = ^TThreadPatchInfo;
+
+    TThreadParameter = record
+      ResourcePatchInfos: TList;
+      PatchInfos: TList<PThreadPatchInfo>;
+      Settings: TSettings;
+      AsarFile: TASARFile;
+      ASARCriticalSection: PCriticalSection;
+      Result: AnsiString;
+      Modified: Boolean;
+      Exception: string;
+    end;
+    PThreadParameter = ^TThreadParameter;
+
+  var
     FSettings: TSettings;
     FLog: TLog;
 
@@ -31,6 +62,8 @@ type
 
     FCssError: Boolean;
     FJsError: Boolean;
+
+    class procedure PatchThread(const Parameters: PThreadParameter); stdcall; static;
   public
     constructor Create(const Settings: TSettings; const Log: TLog);
     destructor Destroy; override;
@@ -45,15 +78,82 @@ type
     property JsError: Boolean read FJsError;
   end;
 
-  TResourcePatchInfo = record
-    Setting: TResourceColorSetting;
-    Patch: TResourceColorSettingPatch;
-  end;
-  PResourcePatchInfo = ^TResourcePatchInfo;
-
 implementation
 
 { TResourcePatcher }
+
+class procedure TResourcePatcher.PatchThread(const Parameters: PThreadParameter); stdcall;
+var
+  StrLen: Int64;
+  ReplaceCount: LongInt;
+  ThreadPatchInfo: PThreadPatchInfo;
+  ThreadResourcePatchInfo: PThreadResourcePatchInfo;
+  RegEx: TRegExpr;
+begin
+  try
+    EnterCriticalSection(Parameters.ASARCriticalSection);
+    try
+      SetString(Parameters.Result, PAnsiChar(Parameters.AsarFile.Contents.Memory), Parameters.AsarFile.Contents.Size);
+    finally
+      LeaveCriticalSection(Parameters.ASARCriticalSection);
+    end;
+
+    for ThreadPatchInfo in Parameters.PatchInfos do
+    begin
+      if ((ThreadPatchInfo.Target = tJs) and (not Parameters.AsarFile.Name.EndsWith('.js', True))) or ((ThreadPatchInfo.Target = tCss) and (not Parameters.AsarFile.Name.EndsWith('.css', True))) then
+        Continue;
+
+      if ThreadPatchInfo.IsRegEx then
+      begin
+        RegEx := TRegExpr.Create;
+        RegEx.ModifierI := True;
+        RegEx.ModifierM := True;
+//        RegEx.ModifierG := True;
+        try
+          StrLen := Parameters.Result.Length;
+          RegEx.Expression := ThreadPatchInfo.Search;
+          Parameters.Result := RegEx.Replace(Parameters.Result, ThreadPatchInfo.Replace, True);
+          if StrLen <> Parameters.Result.Length then
+          begin
+            Parameters.Modified := True;
+            InterLockedIncrement(ThreadPatchInfo.Matches);
+          end;
+        finally
+          RegEx.Free;
+        end;
+      end else
+      begin
+        Parameters.Result := StringReplace(Parameters.Result, ThreadPatchInfo.Search, ThreadPatchInfo.Replace, ThreadPatchInfo.ReplaceFlags, ReplaceCount);
+        if ReplaceCount > 0 then
+        begin
+          Parameters.Modified := True;
+          InterLockedExchangeAdd(ThreadPatchInfo.Matches, ReplaceCount);
+        end;
+      end;
+    end;
+
+    for ThreadResourcePatchInfo in Parameters.ResourcePatchInfos do
+    begin
+      if Parameters.AsarFile.Name.EndsWith('.css', True) and (ThreadResourcePatchInfo.Patch.Target = tCss) then
+        Parameters.Result := ThreadResourcePatchInfo.Patch.Execute(Parameters.Result, ThreadResourcePatchInfo.Setting.GetColor(ThreadResourcePatchInfo.Patch.ColorAdjustment), ReplaceCount)
+      else if Parameters.AsarFile.Name.EndsWith('.js', True) and (ThreadResourcePatchInfo.Patch.Target = tJs) then
+        Parameters.Result := ThreadResourcePatchInfo.Patch.Execute(Parameters.Result, ThreadResourcePatchInfo.Setting.GetColor(ThreadResourcePatchInfo.Patch.ColorAdjustment), ReplaceCount)
+      else
+        ReplaceCount := 0;
+
+      if ReplaceCount > 0 then
+      begin
+        Parameters.Modified := True;
+        InterLockedExchangeAdd(ThreadResourcePatchInfo.Matches, ReplaceCount);
+      end;
+    end;
+  except
+    on E: Exception do
+    begin
+      Parameters.Exception := E.Message;
+    end;
+  end;
+end;
 
 constructor TResourcePatcher.Create(const Settings: TSettings; const Log: TLog);
 begin
@@ -72,7 +172,7 @@ begin
   inherited;
 end;
 
-function SortResourcePatchInfos(A, B: PResourcePatchInfo): LongInt; register;
+function SortResourcePatchInfos(A, B: PThreadResourcePatchInfo): LongInt; register;
 begin
   if A.Patch.SearchText.Length > B.Patch.SearchText.Length then
     Result := -1
@@ -94,38 +194,60 @@ type
     Search: string;
     Replace: string;
   end;
-var
-  Asar: TASAR;
-  AsarCss, AsarSvgJs, AsarMainJs, AsarPreloadJs: TASARFile;
-  ReplaceCount, StrLen, FileOffset: Integer;
-  Css, SvgJs, MainJs, PreloadJs: AnsiString;
-  ColorSetting: TColorSetting;
-  ResourcePatch: TResourceColorSettingPatch;
-  StringReplace: TStringReplace;
-  RegExReplace: TRegExReplace;
-  RegEx: TRegExpr;
-  FileUpdate: TPair<TJSONObject, string>;
-  FileUpdates: TDictionary<TJSONObject, string>;
-  ResourcePatchInfo: PResourcePatchInfo;
-  ResourcePatchInfos: TList;
+
 const
-  PreloadJsPatch: AnsiString = '(function() { var fs = require("fs"); var h = fs.openSync("\\\\.\\wacommunication", "w+"); window.wmcall = function(method, data) ' +
+  FPreloadJsPatch: AnsiString = '(function() { var fs = require("fs"); var h = fs.openSync("\\\\.\\wacommunication", "w+"); window.wmcall = function(method, data) ' +
     '{ var b = Buffer.alloc(1024); fs.writeSync(h, JSON.stringify({ method: method, data: data })); fs.readSync(h, b, 0, 1024, 0); return JSON.parse(b.toString()); }; }());';
-  CssStringReplacements: array[0..5] of TStringReplace = (
+  FCssStringReplacements: array[0..5] of TStringReplace = (
     (Search: '#windows-title-minimize.blurred{opacity:.7}'; Replace: '#windows-title-minimize.blurred{opacity:1}'; ReplaceFlags: []),
     (Search: '#windows-title-maximize.blurred{opacity:.7}'; Replace: '#windows-title-maximize.blurred{opacity:1}'; ReplaceFlags: []),
     (Search: '#windows-title-close.blurred{opacity:.7}'; Replace: '#windows-title-close.blurred{opacity:1}'; ReplaceFlags: []),
     (Search: '#windows-title-minimize{position:absolute;'; Replace: '#windows-title-minimize{position:absolute;cursor:default;'; ReplaceFlags: []),
     (Search: '#windows-title-maximize{position:absolute;'; Replace: '#windows-title-maximize{position:absolute;cursor:default;'; ReplaceFlags: []),
     (Search: '#windows-title-close{position:absolute;'; Replace: '#windows-title-close{position:absolute;cursor:default;'; ReplaceFlags: []));
-  JsRegExReplacements: array[0..3] of TRegExReplace = (
+  FJsRegExReplacements: array[0..3] of TRegExReplace = (
     (Search: 'return (.)\.decrypt\((.)\)\.then\(\(function\((.)\)\{return (.)\.readNode\(new (.)\((.)\)\)';
     Replace: 'return $1.decrypt($2).then((function($3){ var vv = $4.readNode(new $5($6)); window.wmcall("socket_in", vv); return vv;'),
     (Search: 'return (.)\.writeNode\((.),(.)\),(.)\.encrypt\((.)\.toBuffer\(\)\)\}\)\)'; Replace: 'if (!window.wmcall("socket_out", $3)) return; return $1.writeNode($2,$3),$4.encrypt($5.toBuffer())}))'),
     (Search: 'var (.)=this\.parseMsg\((.)\[0\],"relay"\);'; Replace: 'var $1=this.parseMsg($2[0],"relay"); window.wmcall("message", {sent: $1.id.fromMe, jid: $1.id.remote});'),
     (Search: '(.)\.default\.getGlobalSounds\(\)&&\((.)\.id'; Replace: 'window.wmcall("ask_notification_sound", $2.id) &&$1.default.getGlobalSounds()&&($2.id'));
+
+var
+  Asar: TASAR;
+  AsarEntry: TASAREntry;
+  AsarPreloadJs: TASARFile;
+  FileOffset: Integer;
+  PreloadJs: AnsiString;
+  ColorSetting: TColorSetting;
+  ResourcePatch: TResourceColorSettingPatch;
+  StringReplace: TStringReplace;
+  RegExReplace: TRegExReplace;
+  FileUpdate: TPair<TJSONObject, string>;
+  FileUpdates: TDictionary<TJSONObject, string>;
+  ThreadPatchInfo: PThreadPatchInfo;
+  ThreadPatchInfos: TList<PThreadPatchInfo>;
+  ThreadResourcePatchInfo: PThreadResourcePatchInfo;
+  ThreadResourcePatchInfos: TList;
+  Dummy: DWORD;
+  ThreadHandles: array of THandle;
+  ThreadParameter: PThreadParameter;
+  ThreadParameters: TList<PThreadParameter>;
+  ASARCriticalSection: TCriticalSection;
+
+  procedure AddThreadPatchInfo(const Search, Replace: string; const ReplaceFlags: TReplaceFlags; const IsRegEx: Boolean; const Target: TTarget);
+  begin
+    New(ThreadPatchInfo);
+    ZeroMemory(ThreadPatchInfo, SizeOf(TThreadPatchInfo));
+    ThreadPatchInfo.Search := Search;
+    ThreadPatchInfo.Replace := Replace;
+    ThreadPatchInfo.ReplaceFlags := ReplaceFlags;
+    ThreadPatchInfo.IsRegEx := IsRegEx;
+    ThreadPatchInfo.Target := Target;
+    ThreadPatchInfos.Add(ThreadPatchInfo);
+  end;
+
 begin
-  FLog.Info('Patching file "%s"'.Format([FileName]));
+  FLog.Info('Processing file "%s"'.Format([FileName]));
 
   FJSON.Clear;
   FResources.Clear;
@@ -135,63 +257,21 @@ begin
   try
     Asar.Read(Filename);
 
-    AsarCss := TASARFile(Asar.Root.FindEntry('renderer-*.css', TASARFile));
-    AsarSvgJs := TASARFile(Asar.Root.FindEntry('svg.*.js', TASARFile));
-    AsarMainJs := TASARFile(Asar.Root.FindEntry('bootstrap_main.*.js', TASARFile));
+    FCssError := False;
+    FJsError := False;
+
     AsarPreloadJs := TASARFile(Asar.Root.FindEntry('preload.js', TASARFile));
-
-    if Assigned(AsarCss) then
-      SetString(Css, PAnsiChar(AsarCss.Contents.Memory), AsarCss.Contents.Size)
-    else
-      Css := '';
-
-    if Assigned(AsarSvgJs) then
-      SetString(SvgJs, PAnsiChar(AsarSvgJs.Contents.Memory), AsarSvgJs.Contents.Size)
-    else
-      SvgJs := '';
-
-    if Assigned(AsarMainJs) then
-      SetString(MainJs, PAnsiChar(AsarMainJs.Contents.Memory), AsarMainJs.Contents.Size)
-    else
-      MainJs := '';
-
     if Assigned(AsarPreloadJs) then
       SetString(PreloadJs, PAnsiChar(AsarPreloadJs.Contents.Memory), AsarPreloadJs.Contents.Size)
     else
-      PreloadJs := '';
-
-    FCssError := (Css.Length = 0) or (SvgJs.Length = 0);
-    FJsError := (MainJs.Length = 0) or (PreloadJs.Length = 0);
-
-    RegEx := TRegExpr.Create;
-    RegEx.ModifierI := True;
-    RegEx.ModifierM := True;
-    try
-      for RegExReplace in JsRegExReplacements do
-      begin
-        StrLen := MainJs.Length;
-        RegEx.Expression := RegExReplace.Search;
-        MainJs := RegEx.Replace(MainJs, RegExReplace.Replace, True);
-        if StrLen = MainJs.Length then
-        begin
-          FLog.Error('Pattern "%s" could not be found'.Format([RegExReplace.Search]));
-          FJsError := True;
-          Break;
-        end;
-      end;
-    finally
-      RegEx.Free;
-    end;
-
-    if not FJsError then
     begin
-      PreloadJs := PreloadJsPatch + PreloadJs;
-
-      FileUpdates.Add(AsarMainJs.JSONObject, MainJs);
-      FileUpdates.Add(AsarPreloadJs.JSONObject, PreloadJs);
+      FLog.Error('"preload.js" could not be found');
+      FJsError := True;
     end;
 
-    ResourcePatchInfos := TList.Create;
+    ThreadParameters := TList<PThreadParameter>.Create;
+    ThreadPatchInfos := TList<PThreadPatchInfo>.Create;
+    ThreadResourcePatchInfos := TList.Create;
     try
       // Sort patches by length so that simple replacements don't render complex replacements invalid if they include the same color
       for ColorSetting in FSettings.ColorSettings do
@@ -199,47 +279,102 @@ begin
           if ColorSetting.ClassType = TResourceColorSetting then
             for ResourcePatch in TResourceColorSetting(ColorSetting).Patches do
             begin
-              New(ResourcePatchInfo);
-              ResourcePatchInfo.Patch := ResourcePatch;
-              ResourcePatchInfo.Setting := TResourceColorSetting(ColorSetting);
-              ResourcePatchInfos.Add(ResourcePatchInfo);
+              New(ThreadResourcePatchInfo);
+              ZeroMemory(ThreadResourcePatchInfo, SizeOf(TThreadResourcePatchInfo));
+              ThreadResourcePatchInfo.Patch := ResourcePatch;
+              ThreadResourcePatchInfo.Setting := TResourceColorSetting(ColorSetting);
+              ThreadResourcePatchInfos.Add(ThreadResourcePatchInfo);
             end;
 
-      ResourcePatchInfos.Sort(@SortResourcePatchInfos);
+      ThreadResourcePatchInfos.Sort(@SortResourcePatchInfos);
 
-      for ResourcePatchInfo in ResourcePatchInfos do
+      if FSettings.HideMaximize then
       begin
-        if ResourcePatchInfo.Patch.Target = tCss then
-          Css := ResourcePatchInfo.Patch.Execute(Css, ResourcePatchInfo.Setting.GetColor(ResourcePatchInfo.Patch.ColorAdjustment), ReplaceCount)
-        else if ResourcePatchInfo.Patch.Target = tJs then
-          SvgJs := ResourcePatchInfo.Patch.Execute(SvgJs, ResourcePatchInfo.Setting.GetColor(ResourcePatchInfo.Patch.ColorAdjustment), ReplaceCount);
+        AddThreadPatchInfo('#windows-title-minimize{right:90px}', '#windows-title-minimize{right:45px}', [], False, tCss);
+        AddThreadPatchInfo('#windows-title-maximize{position:absolute;width:45px', '#windows-title-maximize{position:absolute;width:0px', [], False, tCss);
+      end;
 
-        if ReplaceCount = 0 then
+      for StringReplace in FCssStringReplacements do
+        AddThreadPatchInfo(StringReplace.Search, StringReplace.Replace, StringReplace.ReplaceFlags, False, tCss);
+
+      if not FJsError then
+        for RegExReplace in FJsRegExReplacements do
+          AddThreadPatchInfo(RegExReplace.Search, RegExReplace.Replace, [], True, tJs);
+
+      InitializeCriticalSection(ASARCriticalSection);
+      try
+        FLog.Debug('Starting threads');
+
+        ThreadHandles := [];
+        for AsarEntry in Asar.Root.Children do
+          if (AsarEntry.ClassType = TASARFile) and (AsarEntry <> AsarPreloadJs) and (AsarEntry.Name.EndsWith('.js', True) or AsarEntry.Name.EndsWith('.css', True)) then
+          begin
+            New(ThreadParameter);
+            ZeroMemory(ThreadParameter, SizeOf(TThreadParameter));
+            ThreadParameter.AsarFile := TASARFile(AsarEntry);
+            ThreadParameter.ResourcePatchInfos := ThreadResourcePatchInfos;
+            ThreadParameter.PatchInfos := ThreadPatchInfos;
+            ThreadParameter.Settings := FSettings;
+            ThreadParameter.ASARCriticalSection := @ASARCriticalSection;
+            ThreadParameters.Add(ThreadParameter);
+
+            SetLength(ThreadHandles, Length(ThreadHandles) + 1);
+            ThreadHandles[High(ThreadHandles)] := CreateThread(nil, 0, @PatchThread, ThreadParameter, 0, Dummy);
+          end;
+
+        WaitForMultipleObjects(Length(ThreadHandles), @ThreadHandles[0], True, INFINITE);
+
+        FLog.Debug('Finished');
+      finally
+        DeleteCriticalSection(ASARCriticalSection);
+      end;
+
+      FLog.Debug('Patch results:');
+
+      for ThreadPatchInfo in ThreadPatchInfos do
+        if ThreadPatchInfo.Matches = 0 then
         begin
-          FLog.Error('String "%s" (%s) could not be found'.Format([ResourcePatchInfo.Patch.SearchText, ResourcePatchInfo.Setting.Description]));
+          FJsError := FJsError or (ThreadPatchInfo.Target = tJs);
+          FCssError := FCssError or (ThreadPatchInfo.Target = tCss);
+          FLog.Error('  "%s" could not be found'.Format([ThreadPatchInfo.Search]));
+        end else
+          FLog.Debug('  Replaced %d occurences of "%s"'.Format([ThreadPatchInfo.Matches, ThreadPatchInfo.Search]));
+
+      for ThreadResourcePatchInfo in ThreadResourcePatchInfos do
+        if ThreadResourcePatchInfo.Matches = 0 then
+        begin
+          FLog.Error('  "%s" (%s) could not be found'.Format([ThreadResourcePatchInfo.Patch.SearchText, ThreadResourcePatchInfo.Setting.Description]));
           FCssError := True;
         end else
-          FLog.Debug('Replaced %d occurences of "%s" (%s)'.Format([ReplaceCount, ResourcePatchInfo.Patch.SearchText, ResourcePatchInfo.Setting.Description]));
-      end;
+          FLog.Debug('  Replaced %d occurences of "%s" (%s)'.Format([ThreadResourcePatchInfo.Matches, ThreadResourcePatchInfo.Patch.SearchText, ThreadResourcePatchInfo.Setting.Description]));
+
+      for ThreadParameter in ThreadParameters do
+        if ThreadParameter.Exception <> '' then
+          FLog.Debug('Thread excepted: %s'.Format([ThreadParameter.Exception]))
+        else if ThreadParameter.Modified and (not (FJsError and ThreadParameter.AsarFile.Name.EndsWith('.js', True))) then
+        begin
+          FLog.Debug('File "%s" was modified'.Format([ThreadParameter.AsarFile.Name]));
+          FileUpdates.Add(ThreadParameter.AsarFile.JSONObject, ThreadParameter.Result);
+        end;
     finally
-      for ResourcePatchInfo in ResourcePatchInfos do
-        Dispose(ResourcePatchInfo);
-      ResourcePatchInfos.Free;
+      for ThreadResourcePatchInfo in ThreadResourcePatchInfos do
+        Dispose(ThreadResourcePatchInfo);
+      ThreadResourcePatchInfos.Free;
+
+      for ThreadPatchInfo in ThreadPatchInfos do
+        Dispose(ThreadPatchInfo);
+      ThreadPatchInfos.Free;
+
+      for ThreadParameter in ThreadParameters do
+        Dispose(ThreadParameter);
+      ThreadParameters.Free;
     end;
 
-    if FSettings.HideMaximize then
+    if not FJsError then
     begin
-      Css := Css.Replace('#windows-title-minimize{right:90px}', '#windows-title-minimize{right:45px}', []);
-      Css := Css.Replace('#windows-title-maximize{position:absolute;width:45px', '#windows-title-maximize{position:absolute;width:0px', []);
+      PreloadJs := FPreloadJsPatch + PreloadJs;
+      FileUpdates.Add(AsarPreloadJs.JSONObject, PreloadJs);
     end;
-
-    for StringReplace in CssStringReplacements do
-      Css := Css.Replace(StringReplace.Search, StringReplace.Replace, StringReplace.ReplaceFlags);
-
-    if Css.Length > 0 then
-      FileUpdates.Add(AsarCss.JSONObject, Css);
-    if SvgJs.Length > 0 then
-      FileUpdates.Add(AsarSvgJs.JSONObject, SvgJs);
 
     FileOffset := Asar.Size - Asar.Header.ContentOffset;
     for FileUpdate in FileUpdates do

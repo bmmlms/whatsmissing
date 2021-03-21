@@ -32,6 +32,8 @@ type
   TCloseHandle = function(hObject: HANDLE): WINBOOL; stdcall;
   TGetFileSizeEx = function(hFile: HANDLE; lpFileSize: PLARGE_INTEGER): BOOL; stdcall;
   TRoGetActivationFactory = function(activatableClassId: HSTRING; const iid: TGUID; out outfactory: LPVOID): HRESULT; stdcall;
+  TRegSetValueExW = function(hKey: HKEY; lpValueName: LPCWSTR; Reserved: DWORD; dwType: DWORD; lpData: Pointer; cbData: DWORD): LONG; stdcall;
+  TRegQueryValueExW = function(hKey: HKEY; lpValueName: LPCWSTR; lpReserved: LPDWORD; lpType: LPDWORD; lpData: LPBYTE; lpcbData: LPDWORD): LONG; stdcall;
 
   TWhatsAppData = record
     MessageType: string;
@@ -73,6 +75,8 @@ type
     OCloseHandle: TCloseHandle;
     OGetFileSizeEx: TGetFileSizeEx;
     ORoGetActivationFactory: TRoGetActivationFactory;
+    ORegSetValueExW: TRegSetValueExW;
+    ORegQueryValueExW: TRegQueryValueExW;
 
     class function HCreateProcessInternalW(hToken: HANDLE; lpApplicationName: LPCWSTR; lpCommandLine: LPWSTR; lpProcessAttributes, lpThreadAttributes: LPSECURITY_ATTRIBUTES;
       bInheritHandles: BOOL; dwCreationFlags: DWORD; lpEnvironment: LPVOID; lpCurrentDirectory: LPCWSTR; lpStartupInfo: LPSTARTUPINFOW; lpProcessInformation: LPPROCESS_INFORMATION; hNewToken: PHANDLE): BOOL; stdcall; static;
@@ -86,6 +90,8 @@ type
     class function HCloseHandle(hObject: HANDLE): WINBOOL; stdcall; static;
     class function HGetFileSizeEx(hFile: HANDLE; lpFileSize: PLARGE_INTEGER): BOOL; stdcall; static;
     class function HRoGetActivationFactory(activatableClassId: HSTRING; const iid: TGUID; out outfactory: LPVOID): HRESULT; stdcall; static;
+    class function HRegSetValueExW(hKey: HKEY; lpValueName: LPCWSTR; Reserved: DWORD; dwType: DWORD; lpData: Pointer; cbData: DWORD): LONG; stdcall; static;
+    class function HRegQueryValueExW(hKey: HKEY; lpValueName: LPCWSTR; lpReserved: LPDWORD; lpType: LPDWORD; lpData: LPBYTE; lpcbData: LPDWORD): LONG; stdcall; static;
   public
     class var
     OnMainWindowCreated: procedure(Handle: THandle);
@@ -132,18 +138,17 @@ begin
 
   Func := GetProcAddress(GetModuleHandle('api-ms-win-core-winrt-l1-1-0.dll'), 'RoGetActivationFactory');
   @ORoGetActivationFactory := InterceptCreate(Func, @HRoGetActivationFactory);
+
+  @ORegSetValueExW := InterceptCreate(@RegSetValueExW, @HRegSetValueExW);
+  @ORegQueryValueExW := InterceptCreate(@RegQueryValueExW, @HRegQueryValueExW);
 end;
 
 class function THooks.HCreateProcessInternalW(hToken: HANDLE; lpApplicationName: LPCWSTR; lpCommandLine: LPWSTR; lpProcessAttributes, lpThreadAttributes: LPSECURITY_ATTRIBUTES;
   bInheritHandles: BOOL; dwCreationFlags: DWORD; lpEnvironment: LPVOID; lpCurrentDirectory: LPCWSTR; lpStartupInfo: LPSTARTUPINFOW; lpProcessInformation: LPPROCESS_INFORMATION; hNewToken: PHANDLE): BOOL; stdcall;
 var
   LastError: Cardinal;
-  ApplicationName: string;
 begin
-  ApplicationName := lpApplicationName;
-  ApplicationName := ApplicationName.Trim;
-
-  if ApplicationName.ToLower.Equals(FMMFLauncher.WhatsMissingExe32.ToLower) or ApplicationName.ToLower.Equals(FMMFLauncher.WhatsMissingExe64.ToLower) then
+  if string(lpApplicationName).Trim.ToLower.Equals(FMMFLauncher.WhatsMissingExe32.ToLower) or string(lpApplicationName).Trim.ToLower.Equals(FMMFLauncher.WhatsMissingExe64.ToLower) then
     Exit(OCreateProcessInternalW(hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation, hNewToken));
 
   Result := OCreateProcessInternalW(hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags or CREATE_SUSPENDED, lpEnvironment,
@@ -229,13 +234,10 @@ end;
 
 class function THooks.HCreateFileW(lpFileName: LPCWSTR; dwDesiredAccess, dwShareMode: DWORD; lpSecurityAttributes: PSecurityAttributes; dwCreationDisposition, dwFlagsAndAttributes: DWORD; hTemplateFile: HANDLE): HANDLE; stdcall;
 var
-  FileName: string;
   VirtualFileData: TVirtualFileData;
   Event: THandle;
 begin
-  FileName := lpFileName;
-
-  if FileName = '\\.\wacommunication' then
+  if string(lpFileName) = '\\.\wacommunication' then
   begin
     if FWACommunicationHandle > 0 then
       Exit(FWACommunicationHandle);
@@ -247,7 +249,7 @@ begin
     Exit(FWACommunicationHandle);
   end;
 
-  if (not FResourceError) and (FileName.EndsWith(FResourcesFile, True)) and (dwDesiredAccess <> $AFFEAFFE) then
+  if (not FResourceError) and (string(lpFileName).EndsWith(FResourcesFile, True)) and (dwDesiredAccess <> $AFFEAFFE) then
   begin
     Result := OCreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
     if Result <> INVALID_HANDLE_VALUE then
@@ -271,7 +273,7 @@ begin
         end;
 
         try
-          FMMFResources := TMMFResources.Create(FResourcesFile, False);
+          FMMFResources := TMMFResources.Create(FResourcesFile, False, 0);
           FMMFResources.Read;
         except
           FResourceError := True;
@@ -549,7 +551,6 @@ begin
           FWAMethodResult := TJSONBoolean.Create(True);
 
         FMMFLauncher.JIDMessageTimes.AddOrSetValue(JSONData.Value, GetTickCount64);
-
         FMMFLauncher.Write;
       end;
     finally
@@ -650,6 +651,44 @@ begin
   end;
 
   Result := ORoGetActivationFactory(activatableClassId, iid, outfactory);
+end;
+
+class function THooks.HRegSetValueExW(hKey: HKEY; lpValueName: LPCWSTR; Reserved: DWORD; dwType: DWORD; lpData: Pointer; cbData: DWORD): LONG; stdcall;
+var
+  UnicodeData: UnicodeString;
+begin
+  if string(lpValueName).Equals(WHATSAPP_APP_MODEL_ID) and (dwType = REG_SZ) and (string(LPCWSTR(lpData)).ToLower.Equals(TFunctions.GetWhatsAppAutostartCommand.ToLower)) then
+  begin
+    FLog.Info('RegSetValueExW(): Writing modified autostart registry value');
+
+    UnicodeData := TFunctions.GetWhatsMissingExePath(FMMFLauncher, TFunctions.IsWindows64Bit);
+
+    Exit(ORegSetValueExW(hKey, lpValueName, Reserved, dwType, PWideChar(UnicodeData), ByteLength(UnicodeData) + 2));
+  end;
+
+  Result := ORegSetValueExW(hKey, lpValueName, Reserved, dwType, lpData, cbData);
+end;
+
+class function THooks.HRegQueryValueExW(hKey: HKEY; lpValueName: LPCWSTR; lpReserved: LPDWORD; lpType: LPDWORD; lpData: LPBYTE; lpcbData: LPDWORD): LONG; stdcall;
+var
+  DataUnicode: UnicodeString;
+begin
+  if string(lpValueName).Equals(WHATSAPP_APP_MODEL_ID) and (lpType <> nil) and (lpType^ = REG_SZ) and (lpData <> nil) and (lpcbData <> nil)
+    and (ORegQueryValueExW(hKey, lpValueName, lpReserved, lpType, lpData, lpcbData) = ERROR_SUCCESS)
+    and string(LPCWSTR(lpData)).ToLower.Equals(TFunctions.GetWhatsMissingExePath(FMMFLauncher, TFunctions.IsWindows64Bit).ToLower) then
+  begin
+    FLog.Info('RegQueryValueExW(): Modifying read autostart registry value');
+
+    FLog.Debug(TFunctions.GetWhatsAppAutostartCommand);
+
+    DataUnicode := TFunctions.GetWhatsAppAutostartCommand;
+    StrCopy(PWideChar(lpData), PWideChar(DataUnicode));
+    lpcbData^ := ByteLength(DataUnicode) + 2;
+
+    Exit(ERROR_SUCCESS);
+  end;
+
+  Result := ORegQueryValueExW(hKey, lpValueName, lpReserved, lpType, lpData, lpcbData);
 end;
 
 end.
