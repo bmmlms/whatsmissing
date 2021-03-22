@@ -58,9 +58,8 @@ type
     chkShowNotificationIcon: TCheckBox;
     PageControl1: TPageControl;
     pnlIndicator: TPanel;
-    pnlIndicator1: TPanel;
-    pnlIndicatorColor: TPanel;
     pnlSave: TPanel;
+    sbColors: TScrollBox;
     tbsSettings: TTabSheet;
     tbsColors: TTabSheet;
     procedure btnSaveClick(Sender: TObject);
@@ -137,12 +136,14 @@ begin
 
   for i := FSettings.ColorSettings.Count - 1 downto 0 do
   begin
-    SettingControl := TColorSettingControl.Create(tbsColors, FSettings.ColorSettings[i]);
+    SettingControl := TColorSettingControl.Create(sbColors, FSettings.ColorSettings[i]);
     SettingControl.Align := alTop;
     SettingControl.Visible := True;
     SettingControl.Height := 10;
     SettingControl.AutoSize := True;
-    SettingControl.Parent := tbsColors;
+    SettingControl.Parent := sbColors;
+    if i < FSettings.ColorSettings.Count - 1 then
+      SettingControl.BorderSpacing.Bottom := 4;
   end;
 end;
 
@@ -310,7 +311,6 @@ begin
 
   if (not OsSupportsImmersiveColors) and (FColorSetting.ColorType = ctImmersive) then
     FColorSetting.ColorType := ctNone;
-
 
   FComboColorType.OnSelect := ComboReplaceTypeSelect;
 
