@@ -638,8 +638,13 @@ begin
   FNewMessages := False;
 
   FMMFLauncher.Read;
-  FMMFLauncher.JIDMessageTimes.Clear;
-  FMMFLauncher.Write;
+  if FMMFLauncher.JIDMessageTimes.Count > 0 then
+  begin
+    FLog.Debug('Clearing JIDMessageTimes');
+
+    FMMFLauncher.JIDMessageTimes.Clear;
+    FMMFLauncher.Write;
+  end;
 
   UpdateNotificationIcon;
 end;

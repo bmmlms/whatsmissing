@@ -482,7 +482,12 @@ begin
         end;
       end else if JSONObject.Strings['method'] = 'socket_out' then
       begin
-        if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'set') then
+        if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'relay') and (WhatsAppData.DataType = 'message') then
+        begin
+          FLog.Debug('Sent chat message');
+
+          PostMessage(FMMFLauncher.WhatsAppWindowHandle, WM_CHAT, WC_READ, 0);
+        end else if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'set') then
         begin
           if WhatsAppData.DataType = 'presence' then
           begin
@@ -549,6 +554,8 @@ begin
 
         if not Assigned(FWAMethodResult) then
           FWAMethodResult := TJSONBoolean.Create(True);
+
+        FLog.Debug('Adding/Updating "%s" in JIDMessageTimes'.Format([JSONData.Value]));
 
         FMMFLauncher.JIDMessageTimes.AddOrSetValue(JSONData.Value, GetTickCount64);
         FMMFLauncher.Write;
