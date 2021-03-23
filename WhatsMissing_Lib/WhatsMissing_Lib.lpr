@@ -64,13 +64,6 @@ begin
       MMFLauncher := TMMFLauncher.Create(False);
     except
       Exit;
-      {
-      on e: exception do
-      TFunctions.MessageBox(0, GetCurrentProcessId.ToString, e.Message, 0 );
-
-      Exit;
-      end;
-      }
     end;
     MMFLauncher.Read;
 
