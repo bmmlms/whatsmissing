@@ -124,6 +124,7 @@ object frmSettings: TfrmSettings
         Width = 385
         HorzScrollBar.Page = 1
         HorzScrollBar.Visible = False
+        VertScrollBar.Increment = 1
         VertScrollBar.Page = 1
         VertScrollBar.Smooth = True
         VertScrollBar.Tracking = True

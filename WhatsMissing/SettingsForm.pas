@@ -303,14 +303,13 @@ begin
   if (not OsSupportsImmersiveColors) and (FColorSetting.ColorType = ctImmersive) then
     FColorSetting.ColorType := ctNone;
 
+  if (FColorSetting.ColorDefault = clNone) and (FColorSetting.ColorType = ctNone) then
+    if OsSupportsImmersiveColors then
+      FColorSetting.ColorType := ctImmersive
+    else
+      FColorSetting.ColorType := ctCustom;
+
   ConfigureComboBox;
-
-  FComboColorType.ItemIndex := FComboColorType.Items.IndexOfObject(TObject(FColorSetting.ColorType));
-  if FComboColorType.ItemIndex = -1 then
-    FComboColorType.ItemIndex := 0;
-
-  if (not OsSupportsImmersiveColors) and (FColorSetting.ColorType = ctImmersive) then
-    FColorSetting.ColorType := ctNone;
 
   FComboColorType.OnSelect := ComboReplaceTypeSelect;
 
@@ -337,7 +336,6 @@ end;
 procedure TColorSettingControl.UpdateColor;
 begin
   FPanelColor.Color := FColorSetting.GetColor(caNone);
-  FPanelColor.Visible := FColorSetting.ColorType <> ctNone;
 end;
 
 procedure TColorSettingControl.ComboReplaceTypeSelect(Sender: TObject);
