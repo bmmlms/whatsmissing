@@ -292,6 +292,8 @@ begin
   FWhatsMissingExe64 := MS.ReadAnsiString;
   FWhatsMissingLib64 := MS.ReadAnsiString;
 
+  FJIDMessageTimes.Clear;
+
   Len := MS.ReadWord;
   for i := 0 to Len - 1 do
   begin
