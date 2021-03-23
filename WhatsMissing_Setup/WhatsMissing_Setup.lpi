@@ -64,6 +64,11 @@
               </Win32>
             </Options>
           </Linking>
+          <Other>
+            <CompilerMessages>
+              <IgnoredMessages idx6058="True" idx4104="True"/>
+            </CompilerMessages>
+          </Other>
         </CompilerOptions>
       </Item2>
     </BuildModes>
@@ -140,6 +145,11 @@
         </Win32>
       </Options>
     </Linking>
+    <Other>
+      <CompilerMessages>
+        <IgnoredMessages idx6058="True" idx4104="True"/>
+      </CompilerMessages>
+    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="3">

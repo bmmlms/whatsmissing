@@ -30,13 +30,16 @@ object frmSettings: TfrmSettings
     ClientHeight = 32
     ClientWidth = 393
     TabOrder = 0
-    object btnSave: TButton
-      Left = 296
+    object btnSave: TBitBtn
+      Left = 288
       Height = 32
       Top = 0
-      Width = 97
+      Width = 105
       Align = alRight
-      Caption = 'Save'
+      Caption = '&Save'
+      Default = True
+      Kind = bkOK
+      ModalResult = 1
       OnClick = btnSaveClick
       TabOrder = 0
     end

@@ -406,7 +406,7 @@ end;
 
 function TColorSetting.GetColor(const ColorAdjustment: TColorAdjustment): TColor;
 begin
-  case ColorType of
+  case FColorType of
     ctNone:
       Result := ColorDefault;
     ctImmersive:

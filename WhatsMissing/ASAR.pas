@@ -179,7 +179,6 @@ end;
 
 procedure TASARHeader.Write(Stream: TStream);
 var
-  WriteInt: UInt32;
   JSONString: AnsiString;
 begin
   FData.CompressedJSON := True;

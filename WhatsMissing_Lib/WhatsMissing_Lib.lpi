@@ -154,11 +154,6 @@
         <ExecutableType Value="Library"/>
       </Options>
     </Linking>
-    <Other>
-      <CompilerMessages>
-        <IgnoredMessages idx5091="True" idx5057="True"/>
-      </CompilerMessages>
-    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="3">

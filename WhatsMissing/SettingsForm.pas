@@ -4,6 +4,7 @@ interface
 
 uses
   Classes,
+  ComboEx,
   ComCtrls,
   Constants,
   Controls,
@@ -17,9 +18,9 @@ uses
   Paths,
   ResourcePatcher,
   Settings,
-  UxTheme,
-  StdCtrls,
+  StdCtrls, Buttons,
   SysUtils,
+  UxTheme,
   Windows;
 
 type
@@ -29,7 +30,7 @@ type
   TColorSettingControl = class(TWinControl)
   private
     FLabelDescription: TLabel;
-    FComboColorType: TComboBox;
+    FComboColorType: TComboBoxEx;
     FPanelColorContainer, FPanelColor: TPanel;
 
     FColorSetting: TColorSetting;
@@ -49,7 +50,7 @@ type
   { TfrmSettings }
 
   TfrmSettings = class(TForm)
-    btnSave: TButton;
+    btnSave: TBitBtn;
     chkIndicateNewMessages: TCheckBox;
     chkSuppressConsecutiveNotificationSounds: TCheckBox;
     chkSuppressPresenceAvailable: TCheckBox;
@@ -281,9 +282,9 @@ begin
   RightContainer.Color := clNone;
   RightContainer.Parent := Self;
 
-  FComboColorType := TComboBox.Create(Self);
+  FComboColorType := TComboBoxEx.Create(Self);
   FComboColorType.Align := alClient;
-  FComboColorType.Style := csDropDownList;
+  FComboColorType.Style := csExDropDownList;
   FComboColorType.BorderSpacing.Right := 8;
   FComboColorType.Parent := RightContainer;
 
@@ -340,7 +341,7 @@ end;
 
 procedure TColorSettingControl.ComboReplaceTypeSelect(Sender: TObject);
 begin
-  FColorSetting.ColorType := TColorType(FComboColorType.Items.Objects[FComboColorType.ItemIndex]);
+  FColorSetting.ColorType := TColorType(FComboColorType.ItemsEx[FComboColorType.ItemIndex].Data);
   UpdateColor;
 end;
 
@@ -367,14 +368,22 @@ begin
 end;
 
 procedure TColorSettingControl.ConfigureComboBox;
+var
+  i: Integer;
 begin
   if FColorSetting.ClassType = TResourceColorSetting then
-    FComboColorType.Items.AddObject('Use default', Pointer(ctNone));
+    FComboColorType.ItemsEx.AddItem('Use default', -1, -1, -1, -1, Pointer(ctNone));
   if OsSupportsImmersiveColors then
-    FComboColorType.Items.AddObject('Use windows color', Pointer(ctImmersive));
-  FComboColorType.Items.AddObject('Use custom color', Pointer(ctCustom));
+    FComboColorType.ItemsEx.AddItem('Use windows color', -1, -1, -1, -1, Pointer(ctImmersive));
+  FComboColorType.ItemsEx.AddItem('Use custom color', -1, -1, -1, -1, Pointer(ctCustom));
 
-  FComboColorType.ItemIndex := FComboColorType.Items.IndexOfObject(TObject(FColorSetting.ColorType));
+  for i := 0 to FComboColorType.ItemsEx.Count - 1 do
+    if FComboColorType.ItemsEx[i].Data = Pointer(FColorSetting.ColorType) then
+    begin
+      FComboColorType.ItemIndex := i;
+      Break;
+    end;
+
   if FComboColorType.ItemIndex = -1 then
     FComboColorType.ItemIndex := 0;
 end;
