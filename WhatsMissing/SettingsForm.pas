@@ -50,6 +50,7 @@ type
   { TfrmSettings }
 
   TfrmSettings = class(TForm)
+    Bevel1: TBevel;
     btnSave: TBitBtn;
     chkIndicateNewMessages: TCheckBox;
     chkSuppressConsecutiveNotificationSounds: TCheckBox;

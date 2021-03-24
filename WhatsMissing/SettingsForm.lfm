@@ -46,7 +46,7 @@ object frmSettings: TfrmSettings
   end
   object PageControl1: TPageControl
     Left = 4
-    Height = 318
+    Height = 310
     Top = 4
     Width = 393
     ActivePage = tbsSettings
@@ -58,7 +58,7 @@ object frmSettings: TfrmSettings
       ChildSizing.LeftRightSpacing = 4
       ChildSizing.TopBottomSpacing = 4
       ChildSizing.VerticalSpacing = 2
-      ClientHeight = 292
+      ClientHeight = 284
       ClientWidth = 385
       object chkShowNotificationIcon: TCheckBox
         Left = 4
@@ -138,5 +138,13 @@ object frmSettings: TfrmSettings
         TabOrder = 0
       end
     end
+  end
+  object Bevel1: TBevel
+    Left = 4
+    Height = 4
+    Top = 318
+    Width = 393
+    Align = alBottom
+    Shape = bsTopLine
   end
 end
