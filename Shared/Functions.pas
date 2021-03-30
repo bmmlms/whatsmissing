@@ -5,6 +5,7 @@ interface
 uses
   ActiveX,
   Classes,
+  ColorFunctions,
   Constants,
   MMF,
   Paths,
@@ -85,7 +86,6 @@ type
     class function StartProcess(const ExePath: string; Args: string; const InheritHandles, Suspended: Boolean): TStartProcessRes; static;
     class function FindCmdLineSwitch(const Name: string; var Value: string): Boolean; static; overload;
     class function FindCmdLineSwitch(const Name: string): Boolean; static; overload;
-
     class property RegisterWaitForSingleObject: TRegisterWaitForSingleObject read FRegisterWaitForSingleObject;
     class property UnregisterWait: TUnregisterWait read FUnregisterWait;
 
@@ -145,30 +145,20 @@ begin
 end;
 
 class function TFunctions.MessageBox(hWnd: HWND; Text: string; Caption: string; uType: UINT): LongInt;
-var
-  TextUnicode, CaptionUnicode: UnicodeString;
 begin
-  TextUnicode := Text;
-  CaptionUnicode := Caption;
-  Result := MessageBoxW(hWnd, PWideChar(TextUnicode), PWideChar(CaptionUnicode), uType);
+  Result := MessageBoxW(hWnd, PWideChar(UnicodeString(Text)), PWideChar(UnicodeString(Caption)), uType);
 end;
 
 class function TFunctions.CreateFile(FileName: string; dwDesiredAccess: DWORD; dwShareMode: DWORD; lpSecurityAttributes: LPSECURITY_ATTRIBUTES; dwCreationDisposition: DWORD; dwFlagsAndAttributes: DWORD; hTemplateFile: HANDLE): HANDLE;
-var
-  FileNameUnicode: UnicodeString;
 begin
-  FileNameUnicode := FileName;
-  Result := CreateFileW(PWideChar(FileNameUnicode), dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+  Result := CreateFileW(PWideChar(UnicodeString(FileName)), dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
   if Result = INVALID_HANDLE_VALUE then
     raise Exception.Create('CreateFileW() failed: %d'.Format([GetLastError]));
 end;
 
 class function TFunctions.CreateEvent(lpEventAttributes: LPSECURITY_ATTRIBUTES; bManualReset: WINBOOL; bInitialState: WINBOOL; Name: string): HANDLE;
-var
-  NameUnicode: UnicodeString;
 begin
-  NameUnicode := Name;
-  Result := CreateEventW(lpEventAttributes, bManualReset, bInitialState, IfThen<PWideChar>(Name = '', nil, PWideChar(NameUnicode)));
+  Result := CreateEventW(lpEventAttributes, bManualReset, bInitialState, IfThen<PWideChar>(Name = '', nil, PWideChar(UnicodeString(Name))));
   if Result = 0 then
     raise Exception.Create('CreateEventW() failed: %d'.Format([GetLastError]));
 end;
@@ -181,39 +171,27 @@ begin
 end;
 
 class function TFunctions.TryOpenEvent(dwDesiredAccess: DWORD; bInheritHandle: WINBOOL; Name: string): HANDLE;
-var
-  NameUnicode: UnicodeString;
 begin
-  NameUnicode := Name;
-  Result := OpenEventW(dwDesiredAccess, bInheritHandle, PWideChar(NameUnicode));
+  Result := OpenEventW(dwDesiredAccess, bInheritHandle, PWideChar(UnicodeString(Name)));
 end;
 
 class function TFunctions.CreateMutex(lpMutexAttributes: LPSECURITY_ATTRIBUTES; bInitialOwner: WINBOOL; Name: string): HANDLE;
-var
-  NameUnicode: UnicodeString;
 begin
-  NameUnicode := Name;
-  Result := CreateMutexW(lpMutexAttributes, bInitialOwner, PWideChar(NameUnicode));
+  Result := CreateMutexW(lpMutexAttributes, bInitialOwner, PWideChar(UnicodeString(Name)));
   if Result = 0 then
     raise Exception.Create('CreateMutexW() failed: %d'.Format([GetLastError]));
 end;
 
 class function TFunctions.CreateFileMapping(hFile: HANDLE; lpFileMappingAttributes: LPSECURITY_ATTRIBUTES; flProtect: DWORD; dwMaximumSizeHigh: DWORD; dwMaximumSizeLow: DWORD; Name: string): HANDLE;
-var
-  NameUnicode: UnicodeString;
 begin
-  NameUnicode := Name;
-  Result := CreateFileMappingW(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, IfThen<PWideChar>(Name = '', nil, PWideChar(NameUnicode)));
+  Result := CreateFileMappingW(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, IfThen<PWideChar>(Name = '', nil, PWideChar(UnicodeString(Name))));
   if Result = 0 then
     raise Exception.Create('CreateFileMappingW() failed: %d'.Format([GetLastError]));
 end;
 
 class function TFunctions.OpenFileMapping(dwDesiredAccess: DWORD; bInheritHandle: WINBOOL; Name: string): HANDLE;
-var
-  NameUnicode: UnicodeString;
 begin
-  NameUnicode := Name;
-  Result := OpenFileMappingW(dwDesiredAccess, bInheritHandle, IfThen<PWideChar>(Name = '', nil, PWideChar(NameUnicode)));
+  Result := OpenFileMappingW(dwDesiredAccess, bInheritHandle, IfThen<PWideChar>(Name = '', nil, PWideChar(UnicodeString(Name))));
   if Result = 0 then
     raise Exception.Create(('OpenFileMappingW() failed: %d').Format([GetLastError]));
 end;
@@ -300,7 +278,7 @@ begin
     MemSize := Length(LibraryPath) * 2 + 2;
     TargetMemory := VirtualAllocEx(ProcessHandle, nil, MemSize, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
     LL := GetProcAddress(GetModuleHandle('kernel32.dll'), 'LoadLibraryW');
-    if (LL <> nil) and (TargetMemory <> nil) then
+    if Assigned(LL) and Assigned(TargetMemory) then
       if WriteProcessMemory(ProcessHandle, TargetMemory, PWideChar(LibraryPath), MemSize, @Written) and (Written = MemSize) then
         Result := FQueueUserAPC(LL, ThreadHandle, UIntPtr(TargetMemory)) <> 0;
   end;
@@ -322,7 +300,7 @@ begin
   PS := IPropertyStore(P);
   Variant.vt := VT_BSTR;
 
-  Variant.bstrVal := SysAllocString(PWideChar(ExePath));
+  Variant.bstrVal := SysAllocString(PWideChar(UnicodeString(ExePath)));
   if Failed(PS.SetValue(@PKEY_AppUserModel_RelaunchCommand, @Variant)) then
     Result := False;
   SysFreeString(Variant.pbstrVal);
@@ -332,12 +310,12 @@ begin
     Result := False;
   SysFreeString(Variant.pbstrVal);
 
-  Variant.bstrVal := SysAllocString(PWideChar(IconPath));
+  Variant.bstrVal := SysAllocString(PWideChar(UnicodeString(IconPath)));
   if Failed(PS.SetValue(@PKEY_AppUserModel_RelaunchIconResource, @Variant)) then
     Result := False;
   SysFreeString(Variant.pbstrVal);
 
-  Variant.bstrVal := SysAllocString(PWideChar(WHATSAPP_APP_MODEL_ID));
+  Variant.bstrVal := SysAllocString(PWideChar(UnicodeString(WHATSAPP_APP_MODEL_ID)));
   if Failed(PS.SetValue(@PKEY_AppUserModel_ID, @Variant)) then
     Result := False;
   SysFreeString(Variant.pbstrVal);
@@ -444,7 +422,6 @@ var
   Flags: DWORD;
   SI: Windows.STARTUPINFOW;
   PI: Windows.PROCESS_INFORMATION;
-  ApplicationName, CommandLine: UnicodeString;
 begin
   ZeroMemory(@SI, SizeOf(SI));
   SI.cb := SizeOf(SI);
@@ -454,10 +431,7 @@ begin
   else
     Flags := 0;
 
-  Args := '"%s" %s'.Format([ExePath, Args]);
-  ApplicationName := ExePath;
-  CommandLine := Args;
-  Result.Success := CreateProcessW(PWideChar(ApplicationName), PWideChar(CommandLine), nil, nil, InheritHandles, Flags, nil, nil, SI, PI);
+  Result.Success := CreateProcessW(PWideChar(UnicodeString(ExePath)), PWideChar(UnicodeString('"%s" %s'.Format([ExePath, Args]))), nil, nil, InheritHandles, Flags, nil, nil, SI, PI);
   if Result.Success then
   begin
     Result.ProcessHandle := PI.hProcess;
@@ -627,7 +601,7 @@ begin
 
     if Assigned(MMFLauncher) then
     begin
-      MMFLauncher.Read;
+      MMFLauncher.ReadMinimal;
       if WhatsAppRunning.Success then
         AddWindowOrPid(MMFLauncher.WhatsAppWindowHandle, MMFLauncher.LauncherPid)
       else
@@ -818,15 +792,13 @@ var
   Dummy: DWord;
   VerInfo: Pointer;
   VerValue: PVSFixedFileInfo;
-  FileNameUnicode: UnicodeString;
 begin
-  FileNameUnicode := FileName;
-  VerInfoSize := GetFileVersionInfoSizeW(PWideChar(FileNameUnicode), Dummy);
+  VerInfoSize := GetFileVersionInfoSizeW(PWideChar(UnicodeString(FileName)), Dummy);
   if VerInfoSize <> 0 then
   begin
     GetMem(VerInfo, VerInfoSize);
     try
-      if GetFileVersionInfoW(PWideChar(FileNameUnicode), 0, VerInfoSize, VerInfo) then
+      if GetFileVersionInfoW(PWideChar(UnicodeString(FileName)), 0, VerInfoSize, VerInfo) then
         if VerQueryValue(VerInfo, '\', Pointer(VerValue), VerValueSize) then
           Exit('%d.%d.%d.%d'.Format([VerValue.dwFileVersionMS shr 16, VerValue.dwFileVersionMS and $FFFF, VerValue.dwFileVersionLS shr 16, VerValue.dwFileVersionLS and $FFFF]));
     finally
@@ -838,11 +810,8 @@ begin
 end;
 
 class procedure TFunctions.SetCurrentProcessExplicitAppUserModelID(AppID: string);
-var
-  AppIDUnicode: UnicodeString;
 begin
-  AppIDUnicode := AppID;
-  if FSetCurrentProcessExplicitAppUserModelID(PWideChar(AppIDUnicode)) <> S_OK then
+  if FSetCurrentProcessExplicitAppUserModelID(PWideChar(UnicodeString(AppID))) <> S_OK then
     raise Exception.Create('SetCurrentProcessExplicitAppUserModelID() failed');
 end;
 

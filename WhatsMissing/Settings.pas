@@ -98,10 +98,12 @@ type
     FLastUsedWhatsAppHash: Integer;
 
     FColorSettings: TList<TColorSetting>;
-    FIndicatorColor: TColorSetting;
+    FNotificationIconBadgeColor: TColorSetting;
+    FNotificationIconBadgeTextColor: TColorSetting;
 
     FShowNotificationIcon: Boolean;
-    FIndicateNewMessages: Boolean;
+    FShowUnreadMessagesBadge: Boolean;
+    FExcludeUnreadMessagesMutedChats: Boolean;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
     FSuppressPresenceAvailable: Boolean;
@@ -126,7 +128,8 @@ type
     property ColorSettings: TList<TColorSetting> read FColorSettings;
 
     property ShowNotificationIcon: Boolean read FShowNotificationIcon write FShowNotificationIcon;
-    property IndicateNewMessages: Boolean read FIndicateNewMessages write FIndicateNewMessages;
+    property ShowUnreadMessagesBadge: Boolean read FShowUnreadMessagesBadge write FShowUnreadMessagesBadge;
+    property ExcludeUnreadMessagesMutedChats: Boolean read FExcludeUnreadMessagesMutedChats write FExcludeUnreadMessagesMutedChats;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
     property SuppressPresenceAvailable: Boolean read FSuppressPresenceAvailable write FSuppressPresenceAvailable;
@@ -181,7 +184,8 @@ begin
       try
         FLastUsedWhatsAppHash := JSONObject.Get('LastUsedWhatsAppHash', FLastUsedWhatsAppHash);
         FShowNotificationIcon := JSONObject.Get('ShowNotificationIcon', FShowNotificationIcon);
-        FIndicateNewMessages := JSONObject.Get('IndicateNewMessages', FIndicateNewMessages);
+        FShowUnreadMessagesBadge := JSONObject.Get('ShowUnreadMessagesBadge', FShowUnreadMessagesBadge);
+        FExcludeUnreadMessagesMutedChats := JSONObject.Get('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
         FHideMaximize := JSONObject.Get('HideMaximize', FHideMaximize);
         FAlwaysOnTop := JSONObject.Get('AlwaysOnTop', FAlwaysOnTop);
         FSuppressPresenceAvailable := JSONObject.Get('SuppressPresenceAvailable', FSuppressPresenceAvailable);
@@ -228,7 +232,8 @@ begin
   try
     JSONObject.Add('LastUsedWhatsAppHash', FLastUsedWhatsAppHash);
     JSONObject.Add('ShowNotificationIcon', FShowNotificationIcon);
-    JSONObject.Add('IndicateNewMessages', FIndicateNewMessages);
+    JSONObject.Add('ShowUnreadMessagesBadge', FShowUnreadMessagesBadge);
+    JSONObject.Add('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
     JSONObject.Add('HideMaximize', FHideMaximize);
     JSONObject.Add('AlwaysOnTop', FAlwaysOnTop);
     JSONObject.Add('SuppressPresenceAvailable', FSuppressPresenceAvailable);
@@ -264,8 +269,10 @@ end;
 procedure TSettings.CopyToMMF(MMF: TMMFLauncher);
 begin
   MMF.ShowNotificationIcon := FShowNotificationIcon;
-  MMF.IndicateNewMessages := FIndicateNewMessages;
-  MMF.IndicatorColor := FIndicatorColor.GetColor(caNone);
+  MMF.ShowUnreadMessagesBadge := FShowUnreadMessagesBadge;
+  MMF.ExcludeUnreadMessagesMutedChats := FExcludeUnreadMessagesMutedChats;
+  MMF.NotificationIconBadgeColor := ColorToRGB(FNotificationIconBadgeColor.GetColor(caNone));
+  MMF.NotificationIconBadgeTextColor := ColorToRGB(FNotificationIconBadgeTextColor.GetColor(caNone));
   MMF.HideMaximize := FHideMaximize;
   MMF.AlwaysOnTop := FAlwaysOnTop;
   MMF.SuppressPresenceAvailable := FSuppressPresenceAvailable;
@@ -281,7 +288,9 @@ begin
     ColorSetting.Free;
   FColorSettings.Clear;
 
-  FIndicatorColor := TColorSetting.Create(500, 'Notification icon message indicator', ImmersiveLightWUWarning, ctImmersive);
+  FNotificationIconBadgeColor := TColorSetting.Create(500, 'Notification icon badge', ImmersiveLightWUError, ctImmersive);
+
+  FNotificationIconBadgeTextColor := TColorSetting.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted, ctImmersive);
 
   // --teal-lighter
   FColorSettings.Add(TResourceColorSetting.Create(1, 'Titlebar', TFunctions.HTMLToColor('00bfa5'), ImmersiveSystemAccent, ctImmersive, [TResourceColorSettingPatch.Create('00bfa5')]));
@@ -296,12 +305,14 @@ begin
   FColorSettings.Add(TResourceColorSetting.Create(3, 'Progressbar', TFunctions.HTMLToColor('00d9bb'), ImmersiveControlLightProgressForeground, ctImmersive, [TResourceColorSettingPatch.Create('00d9bb')]));
 
   // --unread-marker-background
-  FColorSettings.Add(TResourceColorSetting.Create(4, 'Unread message badge', TFunctions.HTMLToColor('06d755'), ImmersiveLightWUWarning, ctImmersive, [TResourceColorSettingPatch.Create('06d755')]));
+  FColorSettings.Add(TResourceColorSetting.Create(4, 'Unread message badge', TFunctions.HTMLToColor('06d755'), ImmersiveLightWUError, ctImmersive, [TResourceColorSettingPatch.Create('06d755')]));
 
-  FColorSettings.Add(FIndicatorColor);
+  FColorSettings.Add(FNotificationIconBadgeColor);
+
+  FColorSettings.Add(FNotificationIconBadgeTextColor);
 
   // --ptt-green
-  FColorSettings.Add(TResourceColorSetting.Create(11, 'New voice mail icon', TFunctions.HTMLToColor('09d261'), ImmersiveLightWUWarning, ctImmersive, [TResourceColorSettingPatch.Create('09d261'), TResourceColorSettingPatch.Create('09D261').JS]));
+  FColorSettings.Add(TResourceColorSetting.Create(11, 'New voice mail icon', TFunctions.HTMLToColor('09d261'), ImmersiveLightWUError, ctImmersive, [TResourceColorSettingPatch.Create('09d261'), TResourceColorSettingPatch.Create('09D261').JS]));
 
   // --ptt-blue, --icon-ack
   FColorSettings.Add(TResourceColorSetting.Create(12, 'Acknowledged icons', TFunctions.HTMLToColor('4fc3f7'), ImmersiveLightWUNormal, ctImmersive, [TResourceColorSettingPatch.Create('4fc3f7')]));
@@ -348,7 +359,8 @@ begin
     [TResourceColorSettingPatch.Create('#windows-title-close:hover{background-color:var(--teal-hover)}', '#windows-title-close:hover{background-color:#%COLOR%}')]));
 
   FShowNotificationIcon := True;
-  FIndicateNewMessages := True;
+  FShowUnreadMessagesBadge := True;
+  FExcludeUnreadMessagesMutedChats := False;
   FHideMaximize := False;
   FAlwaysOnTop := False;
   FSuppressPresenceAvailable := False;

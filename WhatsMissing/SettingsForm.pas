@@ -52,24 +52,23 @@ type
   TfrmSettings = class(TForm)
     Bevel1: TBevel;
     btnSave: TBitBtn;
-    chkIndicateNewMessages: TCheckBox;
+    chkShowUnreadMessagesBadge: TCheckBox;
+    chkExcludeUnreadMessagesMutedChats: TCheckBox;
     chkSuppressConsecutiveNotificationSounds: TCheckBox;
     chkSuppressPresenceAvailable: TCheckBox;
     chkSuppressPresenceComposing: TCheckBox;
     chkHideMaximize: TCheckBox;
     chkShowNotificationIcon: TCheckBox;
     PageControl1: TPageControl;
-    pnlIndicator: TPanel;
     pnlSave: TPanel;
     sbColors: TScrollBox;
     tbsSettings: TTabSheet;
     tbsColors: TTabSheet;
     procedure btnSaveClick(Sender: TObject);
-    procedure chkShowNotificationIconChange(Sender: TObject);
+    procedure CheckBoxChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormShow(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure pnlIndicatorColorClick(Sender: TObject);
   private
     FSettings: TSettings;
     FMMFSettings: TMMFSettings;
@@ -126,15 +125,17 @@ begin
   end;
 
   chkShowNotificationIcon.Checked := FSettings.ShowNotificationIcon;
-  chkIndicateNewMessages.Checked := FSettings.IndicateNewMessages;
+  chkShowUnreadMessagesBadge.Checked := FSettings.ShowUnreadMessagesBadge;
+  chkExcludeUnreadMessagesMutedChats.Checked := FSettings.ExcludeUnreadMessagesMutedChats;
   chkHideMaximize.Checked := FSettings.HideMaximize;
   chkSuppressPresenceAvailable.Checked := FSettings.SuppressPresenceAvailable;
   chkSuppressPresenceComposing.Checked := FSettings.SuppressPresenceComposing;
   chkSuppressConsecutiveNotificationSounds.Checked := FSettings.SuppressConsecutiveNotificationSounds;
 
-  chkShowNotificationIconChange(chkShowNotificationIcon);
+  CheckBoxChange(nil);
 
-  chkIndicateNewMessages.BorderSpacing.Left := CheckBoxRect.Width;
+  chkShowUnreadMessagesBadge.BorderSpacing.Left := CheckBoxRect.Width;
+  chkExcludeUnreadMessagesMutedChats.BorderSpacing.Left := CheckBoxRect.Width;
 
   for i := FSettings.ColorSettings.Count - 1 downto 0 do
   begin
@@ -163,21 +164,6 @@ begin
   end;
 end;
 
-procedure TfrmSettings.pnlIndicatorColorClick(Sender: TObject);
-var
-  Dlg: TColorDialog;
-begin
-  Dlg := TColorDialog.Create(Self);
-  try
-    Dlg.Color := TPanel(Sender).Color;
-
-    if Dlg.Execute then
-      TPanel(Sender).Color := Dlg.Color;
-  finally
-    Dlg.Free;
-  end;
-end;
-
 procedure TfrmSettings.btnSaveClick(Sender: TObject);
 var
   SettingsChangedEvent: THandle;
@@ -198,7 +184,8 @@ begin
         end;
 
     SaveSettings.ShowNotificationIcon := chkShowNotificationIcon.Checked;
-    SaveSettings.IndicateNewMessages := chkIndicateNewMessages.Checked;
+    SaveSettings.ShowUnreadMessagesBadge := chkShowUnreadMessagesBadge.Checked;
+    SaveSettings.ExcludeUnreadMessagesMutedChats := chkExcludeUnreadMessagesMutedChats.Checked;
     SaveSettings.HideMaximize := chkHideMaximize.Checked;
     SaveSettings.SuppressPresenceAvailable := chkSuppressPresenceAvailable.Checked;
     SaveSettings.SuppressPresenceComposing := chkSuppressPresenceComposing.Checked;
@@ -254,9 +241,13 @@ begin
   end;
 end;
 
-procedure TfrmSettings.chkShowNotificationIconChange(Sender: TObject);
+procedure TfrmSettings.CheckBoxChange(Sender: TObject);
 begin
-  chkIndicateNewMessages.Enabled := chkShowNotificationIcon.Checked;
+  if (Sender = nil) or (Sender = chkShowNotificationIcon) then
+    chkShowUnreadMessagesBadge.Enabled := chkShowNotificationIcon.Checked;
+
+  if (Sender = nil) or (Sender = chkShowNotificationIcon) or (Sender = chkShowUnreadMessagesBadge) then
+    chkExcludeUnreadMessagesMutedChats.Enabled := chkShowNotificationIcon.Checked and chkShowUnreadMessagesBadge.Checked;
 end;
 
 { TColorSettingControl }
@@ -285,7 +276,6 @@ begin
 
   FComboColorType := TComboBoxEx.Create(Self);
   FComboColorType.Align := alClient;
-  FComboColorType.Style := csExDropDownList;
   FComboColorType.BorderSpacing.Right := 8;
   FComboColorType.Parent := RightContainer;
 
@@ -331,7 +321,7 @@ procedure TColorSettingControl.DoOnResize;
 begin
   inherited DoOnResize;
 
-  if FPanelColor <> nil then
+  if Assigned(FPanelColor) then
     FPanelColor.Parent.Width := Height;
 end;
 

@@ -330,7 +330,7 @@ end;
 
 function TASARFile.FGetSize: Cardinal;
 begin
-  if FContents = nil then
+  if not Assigned(FContents) then
     Result := FSize
   else
     Result := FContents.Size;

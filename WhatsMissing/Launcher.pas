@@ -285,7 +285,7 @@ begin
 
       FResources.Add(ThreadResult.ResFileHash, ThreadResult.MMF);
 
-      if ThreadResult.MMF = nil then
+      if not Assigned(ThreadResult.MMF) then
         TFunctions.MessageBox(FHandle, 'Critical error applying patches.', '%s error'.Format([APPNAME]), MB_ICONERROR)
       else if ThreadResult.CssError or ThreadResult.JsError then
         if FSettings.LastUsedWhatsAppHash <> ThreadResult.ResFileHash then

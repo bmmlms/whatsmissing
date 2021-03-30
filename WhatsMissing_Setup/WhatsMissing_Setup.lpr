@@ -5,7 +5,6 @@ uses
   Classes,
   Constants,
   Functions,
-  MMF,
   paszlib,
   Paths,
   Registry,

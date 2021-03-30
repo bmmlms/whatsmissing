@@ -3,10 +3,12 @@ unit Window;
 interface
 
 uses
+  ColorFunctions,
   Constants,
   Functions,
   Log,
   MMF,
+  NotificationOverlays,
   Paths,
   ShellAPI,
   SysUtils,
@@ -65,9 +67,9 @@ type
   private
     FMMFLauncher: TMMFLauncher;
     FLog: TLog;
-    FHandle, FNotificationAreaHandle, FLastForegroundWindowHandle, FMessageNotificationIcon, FMouseHook: THandle;
+    FHandle, FNotificationAreaHandle, FLastForegroundWindowHandle, FMouseHook: THandle;
     FOriginalWndProc: Pointer;
-    FHideMaximize, FAlwaysOnTop, FNotificationIconVisible, FNewMessages, FExiting, FWasInCloseButton, FShown: Boolean;
+    FHideMaximize, FAlwaysOnTop, FNotificationIconVisible, FExiting, FWasInCloseButton, FShown: Boolean;
     FNotifyData: TNotifyIconDataW;
     FNotificationMenu: HMENU;
     FTaskbarCreatedMsg: Cardinal;
@@ -81,9 +83,7 @@ type
 
     procedure MenuPopup(const Menu: HMENU);
     function MenuSelect(const ID: UINT): Boolean;
-    function GetIcon(const Handle: HWND): HICON;
-    procedure ShowNotificationIcon;
-    procedure UpdateNotificationIcon;
+    procedure ShowOrUpdateNotificationIcon;
     procedure HideNotificationIcon;
     procedure Fade(const FadeIn: Boolean);
     procedure ShowMainWindow;
@@ -92,9 +92,7 @@ type
     procedure ModifySystemMenu;
     procedure CreateNotificationMenu;
     procedure SetAlwaysOnTop(const Enabled: Boolean);
-    procedure ChatMessageReceived;
-    procedure ChatMessagesRead;
-    procedure CreateMessageNotificationIcon;
+    function CreateNotificationIcon(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
   public
     constructor Create(const hwnd: HWND; const Log: TLog);
     destructor Destroy; override;
@@ -171,15 +169,14 @@ begin
   ModifySystemMenu;
   CreateNotificationMenu;
 
-  FTaskbarCreatedMsg := RegisterWindowMessage('TaskbarCreated');
+  //  ZeroMemory(@FNotifyData, SizeOf(FNotifyData));
 
-  CreateMessageNotificationIcon;
+  FTaskbarCreatedMsg := RegisterWindowMessage('TaskbarCreated');
 end;
 
 destructor TWindow.Destroy;
 begin
   UnhookWindowsHookEx(FMouseHook);
-  DestroyIcon(FMessageNotificationIcon);
 
   HideNotificationIcon;
 end;
@@ -212,9 +209,7 @@ begin
       if Boolean(wParam) and (not FShown) then
       begin
         FShown := True;
-
-        if FMMFLauncher.ShowNotificationIcon then
-          ShowNotificationIcon;
+        ShowOrUpdateNotificationIcon;
       end;
     WM_CLOSE:
       // Prevent closing of window
@@ -233,10 +228,12 @@ begin
       // If WM_ACTIVATE was received from ShowNotificationIconMenu the Message is not forwarded to WhatsApp to suppress sending of "available" presence
       if FForegroundForNotificationIcon then
         Exit(DefWindowProcW(FHandle, uMsg, wParam, lParam));
+    {
     WM_SETFOCUS:
     begin
       PostMessage(FHandle, WM_CHAT, WC_READ, 0);
     end;
+    }
     WM_EXIT:
     begin
       FExiting := True;
@@ -260,10 +257,7 @@ begin
     end;
     WM_CHAT:
     begin
-      if FNotificationIconVisible and (wParam = WC_RECEIVED) and (GetForegroundWindow <> FHandle) then
-        ChatMessageReceived
-      else if wParam = WC_READ then
-        ChatMessagesRead;
+      ShowOrUpdateNotificationIcon;
       Exit(0);
     end;
     WM_ACTIVATE_INSTANCE:
@@ -281,56 +275,31 @@ begin
       FMMFLauncher.Read;
       OldMMF := TMMFLauncher(wParam);
 
-      if OldMMF.ShowNotificationIcon <> FMMFLauncher.ShowNotificationIcon then
-        if FMMFLauncher.ShowNotificationIcon then
-          ShowNotificationIcon
-        else
-        begin
-          if not IsWindowVisible(FHandle) then
-            ShowMainWindow;
-          HideNotificationIcon;
-        end;
-
-      if (OldMMF.IndicateNewMessages <> FMMFLauncher.IndicateNewMessages) or (OldMMF.IndicatorColor <> FMMFLauncher.IndicatorColor) then
+      if FMMFLauncher.ShowNotificationIcon then
+        ShowOrUpdateNotificationIcon
+      else
       begin
-        DestroyIcon(FMessageNotificationIcon);
-        CreateMessageNotificationIcon;
-        UpdateNotificationIcon;
+        if (OldMMF.ShowNotificationIcon <> FMMFLauncher.ShowNotificationIcon) and (not IsWindowVisible(FHandle)) then
+          ShowMainWindow;
+        HideNotificationIcon;
       end;
     end;
     WM_NOTIFICATION_ICON:
     begin
       case lParam of
         NIN_SELECT:
-        begin
-          if (IsWindowVisible(FHandle) and (IsIconic(FHandle) or (FLastForegroundWindowHandle <> FHandle))) or (not IsWindowVisible(FHandle)) or FNewMessages then
+          if (IsWindowVisible(FHandle) and (IsIconic(FHandle) or (FLastForegroundWindowHandle <> FHandle))) or (not IsWindowVisible(FHandle)) then
           begin
-            {
-            if FNewMessages then
-            begin
-              // If unread chat messages exist select the first chat after opening the window
-              // for i := 0 to 10 do
-              //   SendMessage(MainWindow, WM_MOUSEWHEEL, MakeWParam(0, WHEEL_DELTA), MakeLParam(20, 190));
-              SendMessage(FHandle, WM_LBUTTONDOWN, 0, MAKELPARAM(10, 170));
-              SendMessage(FHandle, WM_LBUTTONUP, 0, MAKELPARAM(10, 170));
-            end;
-            }
             ShowMainWindow;
 
             FLastForegroundWindowHandle := FHandle;
           end else
             HideMainWindow;
-
-          PostMessage(FHandle, WM_CHAT, WC_READ, 0);
-        end;
         WM_MOUSEMOVE:
           if GetForegroundWindow <> FNotificationAreaHandle then
             FLastForegroundWindowHandle := GetForegroundWindow;
         WM_CONTEXTMENU:
-        begin
-          PostMessage(FHandle, WM_CHAT, WC_READ, 0);
           ShowNotificationIconMenu;
-        end;
       end;
       Exit(0);
     end;
@@ -338,7 +307,7 @@ begin
       if uMsg = FTaskbarCreatedMsg then
       begin
         if FMMFLauncher.ShowNotificationIcon then
-          ShowNotificationIcon;
+          ShowOrUpdateNotificationIcon;
         Exit(0);
       end;
   end;
@@ -427,28 +396,19 @@ begin
   end;
 end;
 
-function TWindow.GetIcon(const Handle: HWND): HICON;
-begin
-  Result := SendMessage(Handle, WM_GETICON, ICON_SMALL, 0);
-  if Result > 0 then
-    Exit;
-  Result := SendMessage(Handle, WM_GETICON, ICON_BIG, 0);
-  if Result > 0 then
-    Exit;
-  Result := GetClassLongW(Handle, GCLP_HICONSM);
-  if Result > 0 then
-    Exit;
-  Result := GetClassLongW(Handle, GCLP_HICON);
-  if Result > 0 then
-    Exit;
-  Result := LoadIconA(0, IDI_WINLOGO);
-end;
-
-procedure TWindow.ShowNotificationIcon;
+procedure TWindow.ShowOrUpdateNotificationIcon;
+const
+  Days = 365;
+var
+  UnreadMessageCount: Integer;
+  ToolTip: string;
 begin
   FNotificationAreaHandle := FindWindow('Shell_TrayWnd', nil);
-  if FNotificationIconVisible or (FNotificationAreaHandle = 0) then
+  if (not FMMFLauncher.ShowNotificationIcon) or (FNotificationAreaHandle = 0) then
     Exit;
+
+  if FNotificationIconVisible then
+    DestroyIcon(FNotifyData.hIcon);
 
   ZeroMemory(@FNotifyData, SizeOf(FNotifyData));
   FNotifyData.cbSize := SizeOf(FNotifyData);
@@ -458,29 +418,23 @@ begin
   FNotifyData.uCallbackMessage := WM_NOTIFICATION_ICON;
   FNotifyData.uVersion := NOTIFYICON_VERSION;
 
-  if FNewMessages and (FMMFLauncher.IndicateNewMessages) then
-    FNotifyData.hIcon := FMessageNotificationIcon
-  else
-    FNotifyData.hIcon := GetIcon(FHandle);
+  FMMFLauncher.Read;
 
-  StrPLCopy(FNotifyData.szTip, 'WhatsApp', Length(FNotifyData.szTip) - 1);
+  FMMFLauncher.Chats.GetUnreadChats(Days, Length(FNotifyData.szTip), FMMFLauncher.ExcludeUnreadMessagesMutedChats, UnreadMessageCount, ToolTip);
 
-  FNotificationIconVisible := Shell_NotifyIconW(NIM_ADD, @FNotifyData);
-  if FNotificationIconVisible then
-    Shell_NotifyIconW(NIM_SETVERSION, @FNotifyData);
-end;
+  FNotifyData.hIcon := CreateNotificationIcon(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadMessageCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor);
 
-procedure TWindow.UpdateNotificationIcon;
-begin
+  StrPLCopy(FNotifyData.szTip, ToolTip, Length(FNotifyData.szTip) - 1);
+
   if not FNotificationIconVisible then
-    Exit;
-
-  if FNewMessages and (FMMFLauncher.IndicateNewMessages) then
-    FNotifyData.hIcon := FMessageNotificationIcon
-  else
-    FNotifyData.hIcon := GetIcon(FHandle);
-
-  Shell_NotifyIconW(NIM_MODIFY, @FNotifyData);
+  begin
+    FNotificationIconVisible := Shell_NotifyIconW(NIM_ADD, @FNotifyData);
+    if not FNotificationIconVisible then
+      DestroyIcon(FNotifyData.hIcon)
+    else
+      Shell_NotifyIconW(NIM_SETVERSION, @FNotifyData);
+  end else
+    Shell_NotifyIconW(NIM_MODIFY, @FNotifyData);
 end;
 
 procedure TWindow.HideNotificationIcon;
@@ -489,6 +443,7 @@ begin
     Exit;
 
   FNotificationIconVisible := False;
+  DestroyIcon(FNotifyData.hIcon);
   Shell_NotifyIconW(NIM_DELETE, @FNotifyData);
 end;
 
@@ -625,31 +580,352 @@ begin
   AppendMenu(FNotificationMenu, MF_STRING, MENU_EXIT, '&Close');
 end;
 
-procedure TWindow.ChatMessageReceived;
-begin
-  FNewMessages := True;
+function TWindow.CreateNotificationIcon(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
 
-  if FMMFLauncher.IndicateNewMessages then
-    UpdateNotificationIcon;
-end;
+type
+  TByteArray = array of Byte;
 
-procedure TWindow.ChatMessagesRead;
-begin
-  FNewMessages := False;
-
-  FMMFLauncher.Read;
-  if FMMFLauncher.JIDMessageTimes.Count > 0 then
-  begin
-    FLog.Debug('Clearing JIDMessageTimes');
-
-    FMMFLauncher.JIDMessageTimes.Clear;
-    FMMFLauncher.Write;
+  TTextDrawInfo = record
+    Font: HFONT;
+    LeftPadding, TopPadding: LongInt;
+    Width, Height: LongInt;
   end;
 
-  UpdateNotificationIcon;
+  function RGBToColor(R, G, B: Byte): TColor;
+  begin
+    Result := (B shl 16) or (G shl 8) or R;
+  end;
+
+  function GetBitmapHeader(const Size: TSize): BITMAPV5HEADER;
+  begin
+    ZeroMemory(@Result, SizeOf(Result));
+    Result.bV5Size := SizeOf(Result);
+    Result.bV5Width := Size.Width;
+    Result.bV5Height := -Size.Height;
+    Result.bV5Planes := 1;
+    Result.bV5BitCount := 32;
+    Result.bV5Compression := BI_RGB;
+  end;
+
+  procedure UpdateAlpha(const BitmapStart: PRGBQUAD; const BitmapSize: TSize; const Alpha, NewAlpha: Byte);
+  var
+    RGBQuad: PRGBQUAD;
+  begin
+    RGBQuad := BitmapStart;
+    while RGBQuad < BitmapStart + BitmapSize.Width * BitmapSize.Height * SizeOf(TRGBQUAD) do
+    begin
+      if RGBQuad.rgbReserved = Alpha then
+        RGBQuad.rgbReserved := NewAlpha;
+
+      Inc(RGBQuad);
+    end;
+  end;
+
+  procedure AlphaDraw(const Dst, Src: PRGBQUAD; const DstPos: TPoint; const DstSize, SrcSize: TSize);
+  var
+    DstRgb, SrcRgb: PRGBQUAD;
+    OffsetX, Y, SrcCnt: LongInt;
+    Alpha: Byte;
+  begin
+    Y := DstPos.Y;
+
+    OffsetX := DstPos.X;
+
+    SrcRgb := Src;
+    DstRgb := (Dst + Y * DstSize.Width) + OffsetX;
+
+    SrcCnt := 0;
+    while SrcRgb < Src + SrcSize.Width * SrcSize.Height do
+    begin
+      Alpha := Trunc(SrcRgb.rgbReserved + (DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255));
+
+      if Alpha > 0 then
+      begin
+        DstRgb.rgbRed := Trunc((SrcRgb.rgbRed * SrcRgb.rgbReserved + DstRgb.rgbRed * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / Alpha);
+        DstRgb.rgbGreen := Trunc((SrcRgb.rgbGreen * SrcRgb.rgbReserved + DstRgb.rgbGreen * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / Alpha);
+        DstRgb.rgbBlue := Trunc((SrcRgb.rgbBlue * SrcRgb.rgbReserved + DstRgb.rgbBlue * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / Alpha);
+      end;
+
+      DstRgb.rgbReserved := Alpha;
+
+      Inc(SrcRgb);
+      Inc(SrcCnt);
+
+      if SrcCnt mod SrcSize.Width = 0 then
+      begin
+        Inc(Y);
+        DstRgb := (Dst + Y * DstSize.Width) + OffsetX;
+      end else
+        Inc(DstRgb);
+    end;
+  end;
+
+  function GetTextDrawInfo(const FontSize: Integer; const Text: string; var TextDrawInfo: TTextDrawInfo): Boolean;
+  var
+    R: RECT;
+    DC, Bmp, Brush, Font, FontOld: Handle;
+    BitmapHeader: BITMAPV5HEADER;
+    FHeight, X, Y: LongInt;
+    BitmapSize: TSize;
+    BitmapStart, RGBQuad: PRGBQUAD;
+    TopLeft, BottomRight: TPoint;
+  begin
+    Result := False;
+
+    BitmapSize := TSize.Create(FontSize * 2, FontSize * 2);
+    BitmapHeader := GetBitmapHeader(BitmapSize);
+
+    DC := CreateCompatibleDC(0);
+    Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
+
+    SelectObject(DC, Bmp);
+
+    Brush := CreateSolidBrush(BackgroundColor);
+    FillRect(DC, TRect.Create(0, 0, BitmapSize.Width, BitmapSize.Height), Brush);
+    DeleteObject(Brush);
+
+    FHeight := -MulDiv(FontSize, GetDeviceCaps(DC, LOGPIXELSY), 72);
+
+    Font := CreateFont(FHeight, 0, 0, 0, FW_REGULAR, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, nil);
+    FontOld := SelectObject(DC, Font);
+
+    SetTextColor(DC, TextColor);
+    SetBkMode(DC, TRANSPARENT);
+
+    R := TRect.Create(0, 0, BitmapSize.Width, BitmapSize.Height);
+
+    DrawTextW(DC, PWideChar(UnicodeString(Text)), Text.Length, R, DT_TOP or DT_LEFT);
+
+    Font := SelectObject(DC, FontOld);
+
+    TopLeft := TPoint.Create(MAXWORD, MAXWORD);
+    BottomRight := TPoint.Create(0, 0);
+
+    RGBQuad := BitmapStart;
+    while RGBQuad < BitmapStart + BitmapSize.Width * BitmapSize.Height do
+    begin
+      if RGBToColor(RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue) <> BackgroundColor then
+      begin
+        X := (RGBQuad - BitmapStart) mod BitmapSize.Width;
+        Y := (RGBQuad - BitmapStart) div BitmapSize.Height;
+        if X < TopLeft.X then
+          TopLeft.X := X;
+        if Y < TopLeft.Y then
+          TopLeft.Y := Y;
+        if X > BottomRight.X then
+          BottomRight.X := X;
+        if Y > BottomRight.Y then
+          BottomRight.Y := Y;
+
+        Result := True;
+      end;
+      Inc(RGBQuad);
+    end;
+
+    TextDrawInfo.Font := Font;
+    TextDrawInfo.LeftPadding := TopLeft.X;
+    TextDrawInfo.TopPadding := TopLeft.Y;
+    TextDrawInfo.Width := BottomRight.X - TopLeft.X + 1;
+    TextDrawInfo.Height := BottomRight.Y - TopLeft.Y + 1;
+
+    DeleteDC(DC);
+    DeleteObject(Bmp);
+  end;
+
+  function DrawBadge(const Size: TSize; const TextDrawInfo: TTextDrawInfo; const Str: string): TByteArray;
+  var
+    FontOld: HFONT;
+    R: TRect;
+    DC, Bmp, Pen, PenOld, Brush, BrushOld: Handle;
+    BitmapStart: PRGBQUAD;
+    BitmapHeader: BITMAPV5HEADER;
+  begin
+    DC := CreateCompatibleDC(0);
+
+    BitmapHeader := GetBitmapHeader(Size);
+    Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
+
+    SelectObject(DC, Bmp);
+
+    Brush := CreateSolidBrush(BackgroundColor);
+    FillRect(DC, TRect.Create(0, 0, Size.Width, Size.Height), Brush);
+    DeleteObject(Brush);
+
+    UpdateAlpha(BitmapStart, Size, $00, $FF);
+
+    Pen := CreatePen(PS_SOLID, 1, BackgroundColor);
+    PenOld := SelectObject(DC, Pen);
+
+    BrushOld := SelectObject(DC, GetStockObject(HOLLOW_BRUSH));
+    Rectangle(DC, 0, 0, Size.Width, Size.Height);
+    SelectObject(DC, BrushOld);
+
+    UpdateAlpha(BitmapStart, Size, $00, $AA);
+
+    Pen := SelectObject(DC, PenOld);
+    DeleteObject(Pen);
+
+    FontOld := SelectObject(DC, TextDrawInfo.Font);
+    SetTextColor(DC, TextColor);
+    SetBkMode(DC, TRANSPARENT);
+
+    R := TRect.Create(((Size.Width - TextDrawInfo.Width) div 2) - TextDrawInfo.LeftPadding, ((Size.Height - TextDrawInfo.Height) div 2) - TextDrawInfo.TopPadding, Size.Width, Size.Height);
+
+    DrawTextW(DC, PWideChar(UnicodeString(Str)), Str.Length, R, DT_TOP or DT_LEFT);
+
+    SelectObject(DC, FontOld);
+
+    UpdateAlpha(BitmapStart, Size, $00, $FF);
+
+    SetLength(Result, Size.Width * Size.Height * SizeOf(TRGBQUAD));
+    CopyMemory(@Result[0], BitmapStart, Length(Result));
+
+    DeleteDC(DC);
+    DeleteObject(Bmp);
+  end;
+
+const
+  BoxPaddingX = 1;
+  BoxPaddingY = 1;
+var
+  DC, Bmp, Icon: Handle;
+  Text: string;
+  BitmapStart: PRGBQUAD;
+  BitmapHeader: BITMAPV5HEADER;
+  IconInfo: TICONINFO;
+  BitmapInfo: BITMAP;
+  BadgeBitmap: TByteArray;
+  BitmapSize, BoxSize: TSize;
+  BoxPos: TPoint;
+  TextDrawInfo: TTextDrawInfo;
+begin
+  if ExtractIconExW(PWideChar(UnicodeString(ParamStr(0))), 0, nil, @Icon, 1) <> 1 then
+    raise Exception.Create('ExtractIconExW() failed');
+
+  GetIconInfo(Icon, IconInfo);
+
+  GetObject(IconInfo.hbmColor, SizeOf(BitmapInfo), @BitmapInfo);
+
+  DeleteObject(IconInfo.hbmColor);
+  DeleteObject(IconInfo.hbmMask);
+
+  BitmapSize := TSize.Create(BitmapInfo.bmWidth, BitmapInfo.bmHeight);
+
+  DC := CreateCompatibleDC(0);
+
+  BitmapHeader := GetBitmapHeader(BitmapSize);
+  Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
+
+  SelectObject(DC, Bmp);
+
+  DrawIconEx(DC, 0, 0, Icon, BitmapSize.Width, BitmapSize.Height, 0, 0, DI_NORMAL);
+
+  if UnreadCount > 0 then
+  begin
+    Text := IfThen<string>(UnreadCount > 99, '!!!', UnreadCount.ToString);
+
+    if GetTextDrawInfo(Trunc(BitmapSize.Height * 0.45), Text, TextDrawInfo) then
+      try
+        BoxSize := TSize.Create(TextDrawInfo.Width + BoxPaddingX * 2, TextDrawInfo.Height + BoxPaddingY * 2);
+        BoxPos := TPoint.Create(BitmapSize.Width - BoxSize.Width, BitmapSize.Height - BoxSize.Height);
+
+        FillRect(DC, TRect.Create(BoxPos.X - 1, BoxPos.Y - 1, BitmapSize.Width, BitmapSize.Height), GetStockObject(WHITE_BRUSH));
+
+        BadgeBitmap := DrawBadge(BoxSize, TextDrawInfo, Text);
+        AlphaDraw(BitmapStart, @BadgeBitmap[0], BoxPos, BitmapSize, BoxSize);
+      finally
+        DeleteObject(TextDrawInfo.Font);
+      end;
+  end;
+
+  IconInfo.fIcon := True;
+  IconInfo.xHotspot := 0;
+  IconInfo.yHotspot := 0;
+  IconInfo.hbmColor := Bmp;
+  IconInfo.hbmMask := Bmp;
+
+  Result := CreateIconIndirect(IconInfo);
+
+  DeleteDC(DC);
+  DeleteObject(Bmp);
 end;
 
-procedure TWindow.CreateMessageNotificationIcon;
+{
+function TWindow.CreateNotificationIcon(const UnreadCount: Integer): HICON;
+  type
+    TByteArray = array of Byte;
+
+  procedure Draw(const Dst, Src: Pointer; X, Y, DstWidth, SrcWidth, SrcHeight: Integer);
+  var
+    SrcCnt: Integer;
+    DstRgb, SrcRgb: PRGBQUAD;
+    OffsetX: UInt32;
+    A: Byte;
+  begin
+    OffsetX := X * SizeOf(TRGBQUAD);
+
+    SrcRgb := Src;
+    DstRgb := (Dst + Y * DstWidth * SizeOf(TRGBQUAD)) + OffsetX;
+
+    SrcCnt := 0;
+    while SrcRgb < Src + (SrcWidth * SrcHeight * SizeOF(TRGBQUAD)) do
+    begin
+      A := Trunc(SrcRgb.rgbReserved + (DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255));
+
+      if A > 0 then
+      begin
+        DstRgb.rgbRed := Trunc((SrcRgb.rgbRed * SrcRgb.rgbReserved + DstRgb.rgbRed * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / A);
+        DstRgb.rgbGreen := Trunc((SrcRgb.rgbGreen * SrcRgb.rgbReserved + DstRgb.rgbGreen * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / A);
+        DstRgb.rgbBlue := Trunc((SrcRgb.rgbBlue * SrcRgb.rgbReserved + DstRgb.rgbBlue * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / A);
+      end;
+
+      DstRgb.rgbReserved := A;
+
+      SrcRgb := PRGBQUAD(NativeUInt(SrcRgb) + SizeOf(TRGBQUAD));
+      Inc(SrcCnt);
+
+      if SrcCnt mod SrcWidth = 0 then
+      begin
+        Inc(Y);
+        DstRgb := (Dst + Y * DstWidth * SizeOf(TRGBQUAD)) + OffsetX;
+      end else
+        DstRgb := PRGBQUAD(NativeUInt(DstRgb) + SizeOf(TRGBQUAD));
+    end;
+  end;
+
+  function ColorizeGray(const BitmapStart, BitmapEnd: Pointer; const Color, TextColor: TColor): TByteArray;
+  type
+    TGATup = record
+      Gray: Byte;
+      Alpha: Byte;
+    end;
+    PGATup = ^TGATup;
+  var
+    HB, SB, HF, SF, L: Byte;
+    GATup: PGATup;
+    RGBQuad: PRGBQUAD;
+  begin
+    SetLength(Result, (BitmapEnd - BitmapStart) * SizeOf(TGATup));
+
+    ColorToHLS(Color, HB, L, SB);
+    ColorToHLS(TextColor, HF, L, SF);
+
+    GATup := BitmapStart;
+    RGBQuad := @Result[0];
+    while GATup < BitmapEnd do
+    begin
+      if GATup.Gray > $C0 then
+        HLStoRGB(HF, GATup.Gray, SF, RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue)
+      else
+        HLStoRGB(HB, GATup.Gray, SB, RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue);
+
+      RGBQuad.rgbReserved := GATup.Alpha;
+
+      GATup := PGATup(NativeUInt(GATup) + SizeOf(TGATup));
+      RGBQuad := PRGBQUAD(NativeUInt(RGBQuad) + SizeOf(TRGBQUAD));
+    end;
+  end;
+
 var
   CirclePos: Integer;
   DC, Bmp, Pen, PenOld, Brush, BrushOld, Icon: Handle;
@@ -658,28 +934,13 @@ var
   IconInfo: TIconInfo;
   BitmapHeader: BITMAPV5HEADER;
   BitmapInfo: BITMAP;
-
-  function ColorToRGB(Color: TColor): Longint;
-  begin
-    Result := Color and $FFFFFF;
-  end;
-
-  procedure SetColorAlpha(Color: COLORREF; Alpha: Byte);
-  var
-    RGBQuad: PRGBQUAD;
-  begin
-    RGBQuad := BitmapStart;
-    while RGBQuad < BitmapEnd do
-    begin
-      if (RGBQuad.rgbRed = GetRValue(Color)) and (RGBQuad.rgbGreen = GetGValue(Color)) and (RGBQuad.rgbBlue = GetBValue(Color)) then
-        RGBQuad.rgbReserved := Alpha;
-
-      RGBQuad := Pointer(NativeUInt(RGBQuad) + SizeOf(TRGBQUAD));
-    end;
-  end;
-
+  Chat: TChat;
+  NOI: TNotificationOverlayInfo;
+  NotificationBitmap: TByteArray;
 begin
-  Icon := GetIcon(FHandle);
+  if ExtractIconExW(PWideChar(UnicodeString(TPaths.ExePath)), 0, nil, @Icon, 1) <> 1 then
+    // TODO: ...
+  ;
 
   GetIconInfo(Icon, IconInfo);
 
@@ -698,59 +959,25 @@ begin
 
   DC := CreateCompatibleDC(0);
   Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
-  BitmapEnd := BitmapStart + (BitmapInfo.bmWidth * BitmapInfo.bmHeight * SizeOf(TRGBQUAD));
 
   SelectObject(DC, Bmp);
-  DrawIcon(DC, 0, 0, Icon);
+  DrawIconEx(DC, 0, 0, Icon, BitmapInfo.bmWidth, BitmapInfo.bmHeight, 0, 0, DI_NORMAL);
 
-  TransparentColor := ColorToRGB(123);
-  PenColor := ColorToRGB(FMMFLauncher.IndicatorColor - 1);
-  BrushColor := ColorToRGB(FMMFLauncher.IndicatorColor);
-
-  CirclePos := Trunc(BitmapInfo.bmWidth / 2);
-
-  Pen := CreatePen(PS_SOLID, 1, TransparentColor);
-  Brush := CreateSolidBrush(TransparentColor);
-
-  PenOld := SelectObject(DC, Pen);
-  BrushOld := SelectObject(DC, Brush);
-
-  Ellipse(DC, CirclePos, CirclePos, BitmapInfo.bmWidth + 2, BitmapInfo.bmHeight + 2);
-
-  SelectObject(DC, PenOld);
-  SelectObject(DC, BrushOld);
-
-  DeleteObject(Pen);
-  DeleteObject(Brush);
-
-  SetColorAlpha(TransparentColor, 0);
-
-  Pen := CreatePen(PS_SOLID, 1, PenColor);
-  Brush := CreateSolidBrush(BrushColor);
-
-  PenOld := SelectObject(DC, Pen);
-  BrushOld := SelectObject(DC, Brush);
-
-  Ellipse(DC, CirclePos + 2, CirclePos + 2, BitmapInfo.bmWidth, BitmapInfo.bmHeight);
-
-  SelectObject(DC, PenOld);
-  SelectObject(DC, BrushOld);
-
-  DeleteObject(Pen);
-  DeleteObject(Brush);
-
-  SetColorAlpha(PenColor, 200);
-  SetColorAlpha(BrushColor, 255);
+  NOI := GetNotificationOverlay(UnreadCount);
+  NotificationBitmap := ColorizeGray(NOI.Data, Pointer(NativeUInt(NOI.Data) + (NOI.Width * NOI.Height * 2)), FMMFLauncher.IndicatorColor, FMMFLauncher.IndicatorTextColor);
+  Draw(BitmapStart, @NotificationBitmap[0], BitmapInfo.bmWidth - NOI.Width, BitmapInfo.bmHeight - NOI.Height, BitmapInfo.bmWidth, NOI.Width, NOI.Height);
 
   IconInfo.fIcon := True;
   IconInfo.xHotspot := 0;
   IconInfo.yHotspot := 0;
   IconInfo.hbmColor := Bmp;
   IconInfo.hbmMask := Bmp;
-  FMessageNotificationIcon := CreateIconIndirect(IconInfo);
+
+  Result := CreateIconIndirect(IconInfo);
 
   DeleteDC(DC);
   DeleteObject(Bmp);
 end;
+}
 
 end.

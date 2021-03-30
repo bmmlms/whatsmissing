@@ -20,6 +20,7 @@ object frmSettings: TfrmSettings
   OnKeyDown = FormKeyDown
   OnShow = FormShow
   Position = poScreenCenter
+  LCLVersion = '2.0.12.0'
   object pnlSave: TPanel
     Left = 4
     Height = 32
@@ -67,13 +68,13 @@ object frmSettings: TfrmSettings
         Width = 377
         Align = alTop
         Caption = 'Show notification icon'
-        OnChange = chkShowNotificationIconChange
+        OnChange = CheckBoxChange
         TabOrder = 0
       end
       object chkHideMaximize: TCheckBox
         Left = 4
         Height = 19
-        Top = 46
+        Top = 67
         Width = 377
         Align = alTop
         Caption = 'Hide maximize button'
@@ -82,7 +83,7 @@ object frmSettings: TfrmSettings
       object chkSuppressPresenceAvailable: TCheckBox
         Left = 4
         Height = 19
-        Top = 67
+        Top = 88
         Width = 377
         Align = alTop
         Caption = 'Suppress outbound online notifications'
@@ -91,7 +92,7 @@ object frmSettings: TfrmSettings
       object chkSuppressPresenceComposing: TCheckBox
         Left = 4
         Height = 19
-        Top = 88
+        Top = 109
         Width = 377
         Align = alTop
         Caption = 'Suppress outbound typing notifications'
@@ -100,20 +101,30 @@ object frmSettings: TfrmSettings
       object chkSuppressConsecutiveNotificationSounds: TCheckBox
         Left = 4
         Height = 19
-        Top = 109
+        Top = 130
         Width = 377
         Align = alTop
         Caption = 'Suppress consecutive notification sounds'
         TabOrder = 4
       end
-      object chkIndicateNewMessages: TCheckBox
+      object chkShowUnreadMessagesBadge: TCheckBox
         Left = 4
         Height = 19
         Top = 25
         Width = 377
         Align = alTop
-        Caption = 'Indicate new messages on notification icon'
+        Caption = 'Show unread messages badge'
+        OnChange = CheckBoxChange
         TabOrder = 5
+      end
+      object chkExcludeUnreadMessagesMutedChats: TCheckBox
+        Left = 4
+        Height = 19
+        Top = 46
+        Width = 377
+        Align = alTop
+        Caption = 'Exclude unread messages of muted chats'
+        TabOrder = 6
       end
     end
     object tbsColors: TTabSheet

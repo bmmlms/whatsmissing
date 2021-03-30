@@ -23,9 +23,6 @@ const
   WM_EXIT = WM_SHARED + 20;
   WM_NOTIFICATION_ICON = WM_SHARED + 21;
 
-  WC_RECEIVED = 1;
-  WC_READ = 2;
-
   APPNAME = 'WhatsMissing';
   WHATSMISSING_CLASSNAME: PWideChar = 'WhatsMissing_WndCls';
   WHATSMISSING_EXENAME_32 = 'whatsmissing-i386.exe';
