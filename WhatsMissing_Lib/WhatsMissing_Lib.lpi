@@ -19,9 +19,8 @@
     </General>
     <VersionInfo>
       <UseVersionInfo Value="True"/>
-      <MinorVersionNr Value="2"/>
-      <RevisionNr Value="1"/>
-      <StringTable FileDescription="WhatsMissing Library" ProductName="WhatsMissing" ProductVersion="0.2.1.0"/>
+      <MinorVersionNr Value="3"/>
+      <StringTable FileDescription="WhatsMissing Library" ProductName="WhatsMissing" ProductVersion="0.3.0.0"/>
     </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="Debug" Default="True"/>
@@ -34,7 +33,7 @@
           </Target>
           <SearchPaths>
             <IncludeFiles Value="..\SubModules\ImmersiveColors\Source"/>
-            <OtherUnitFiles Value="..\Shared;..\SubModules\DDetours\Source;..\Build\Resources"/>
+            <OtherUnitFiles Value="..\Shared;..\SubModules\DDetours\Source"/>
             <UnitOutputDirectory Value="..\Build\DCU\$(TargetCPU)"/>
           </SearchPaths>
           <Parsing>
@@ -73,7 +72,7 @@
       <FormatVersion Value="2"/>
       <Modes Count="0"/>
     </RunParams>
-    <Units Count="11">
+    <Units Count="9">
       <Unit0>
         <Filename Value="WhatsMissing_Lib.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -110,14 +109,6 @@
         <Filename Value="VirtualFile.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit8>
-      <Unit9>
-        <Filename Value="..\Build\Resources\NotificationOverlays.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit9>
-      <Unit10>
-        <Filename Value="..\Shared\ColorFunctions.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit10>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -128,7 +119,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="..\SubModules\ImmersiveColors\Source"/>
-      <OtherUnitFiles Value="..\Shared;..\SubModules\DDetours\Source;..\Build\Resources"/>
+      <OtherUnitFiles Value="..\Shared;..\SubModules\DDetours\Source"/>
       <UnitOutputDirectory Value="..\Build\DCU\$(TargetCPU)"/>
     </SearchPaths>
     <Parsing>
