@@ -95,7 +95,7 @@ end;
 
 class function TLauncher.WndProcWrapper(hwnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 begin
-  Result := TLauncher(GetPropW(hwnd, WNDPROC_PROPNAME)).WndProc(uMsg, wParam, lParam);
+  Result := TLauncher(GetWindowLongPtrW(hwnd, GWLP_USERDATA)).WndProc(uMsg, wParam, lParam);
 end;
 
 class procedure TLauncher.ResourceThreadWrapper(const Parameter: PResourceThreadParameter); stdcall;
@@ -156,11 +156,8 @@ begin
   FProcessMonitor.Free;
   FSettings.Free;
 
-  // This crashes - no idea why dictionary values are trashed :(
-  {
   for MMFResources in FResources.Values do
     MMFResources.Free;
-  }
   FResources.Free;
 
   inherited;
@@ -179,20 +176,21 @@ begin
   if RegisterClassW(FWindowClass) = 0 then
     raise Exception.Create('Error registering window class');
 
-  FHandle := CreateWindowExW(WS_EX_APPWINDOW, FWindowClass.lpszClassName, APPNAME, 0, Integer.MaxValue, Integer.MaxValue, 0, 0, 0, 0, HInstance, nil);
+  FHandle := CreateWindowExW(WS_EX_APPWINDOW, FWindowClass.lpszClassName, 'Starting WhatsApp', 0, Integer.MaxValue, Integer.MaxValue, 0, 0, 0, 0, HInstance, nil);
   if FHandle = 0 then
     raise Exception.Create('CreateWindowExW() failed: %d'.Format([GetLastError]));
 
-  SetPropW(FHandle, WNDPROC_PROPNAME, HANDLE(Self));
-
-  SetWindowTextW(FHandle, 'Starting WhatsApp');
-  TFunctions.SetPropertyStore(FHandle, TPaths.ExePath, TPaths.WhatsAppExePath);
-
-  FTaskbarButtonCreatedMsg := RegisterWindowMessageW('TaskbarButtonCreated');
+  SetWindowLongPtrW(FHandle, GWLP_USERDATA, HANDLE(Self));
+  if GetLastError <> 0 then
+    raise Exception.Create('SetWindowLongPtrW() failed: %d'.Format([GetLastError]));
 
   SetLastError(0);
   if (SetWindowLongPtrW(FHandle, GWLP_WNDPROC, LONG_PTR(@WndProcWrapper)) = 0) and (GetLastError <> 0) then
     raise Exception.Create('SetWindowLongPtrW() failed: %d'.Format([GetLastError]));
+
+  TFunctions.SetPropertyStore(FHandle, TPaths.ExePath, TPaths.WhatsAppExePath);
+
+  FTaskbarButtonCreatedMsg := RegisterWindowMessageW('TaskbarButtonCreated');
 
   PostMessage(FHandle, WM_START, 0, 0);
 
@@ -344,7 +342,6 @@ begin
         Exit;
     WM_NCDESTROY:
     begin
-      RemovePropW(FHandle, WNDPROC_PROPNAME);
       TFunctions.ClearPropertyStore(FHandle);
       PostQuitMessage(0);
       Exit;
