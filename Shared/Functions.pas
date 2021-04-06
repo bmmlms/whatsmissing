@@ -5,7 +5,6 @@ interface
 uses
   ActiveX,
   Classes,
-  ColorFunctions,
   Constants,
   MMF,
   Paths,
@@ -16,6 +15,8 @@ uses
   Windows;
 
 type
+  TColor = -$7FFFFFFF-1..$7FFFFFFF;
+
   TCardinalArray = array of Cardinal;
 
   TStartProcessRes = record
