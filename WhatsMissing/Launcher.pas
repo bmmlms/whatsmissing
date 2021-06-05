@@ -268,8 +268,6 @@ begin
         ThreadParameters.PID := wParam;
         FResourceThreadHandle := CreateThread(nil, 0, @ResourceThreadWrapper, ThreadParameters, 0, Dummy);
       end;
-
-      Exit;
     end;
     WM_PATCH_RESOURCES_DONE:
     begin
@@ -288,8 +286,6 @@ begin
       else if ThreadResult.CssError or ThreadResult.JsError then
         if FSettings.LastUsedWhatsAppHash <> ThreadResult.ResFileHash then
           TFunctions.MessageBox(FHandle, 'Some patches could not be applied, please update %s.'.Format([APPNAME]), '%s error'.Format([APPNAME]), MB_ICONERROR);
-
-      Exit;
     end;
     WM_CHECK_LINKS:
     begin
@@ -300,17 +296,14 @@ begin
       finally
         WhatsAppExes.Free;
       end;
-      Exit;
     end;
     WM_START:
     begin
       WMStart;
-      Exit;
     end;
     WM_CHILD_PROCESS_STARTED:
     begin
       FProcessMonitor.AddProcessId(wParam);
-      Exit;
     end;
     WM_MAINWINDOW_CREATED:
     begin
@@ -318,33 +311,26 @@ begin
       FMMFLauncher.WhatsAppGuiPid := lParam;
       FMMFLauncher.WhatsAppWindowHandle := wParam;
       FMMFLauncher.Write;
-      Exit;
     end;
     WM_WINDOW_SHOWN:
     begin
       ShowWindow(FHandle, SW_HIDE);
-      Exit;
     end;
     WM_NOTIFICATION_ICON:
     begin
       TFunctions.AllowSetForegroundWindow(FMMFLauncher.WhatsAppGuiPid);
       PostMessage(FMMFLauncher.WhatsAppWindowHandle, uMsg, wParam, lParam);
-      Exit;
     end;
     WM_EXIT:
     begin
       FExiting := True;
       SendMessage(FHandle, WM_CLOSE, 0, 0);
-      Exit;
     end;
-    WM_CLOSE:
-      if not FExiting then
-        Exit;
+    WM_CLOSE: ;
     WM_NCDESTROY:
     begin
       TFunctions.ClearPropertyStore(FHandle);
       PostQuitMessage(0);
-      Exit;
     end;
     else
       if uMsg = FTaskbarButtonCreatedMsg then
@@ -352,10 +338,9 @@ begin
         if Succeeded(CoCreateInstance(CLSID_TaskbarList, nil, CLSCTX_INPROC_SERVER, IID_ITaskbarList3, TaskbarList)) then
           TaskbarList.SetProgressState(FHandle, TBPF_INDETERMINATE);
         Exit;
-      end;
+      end else
+        Exit(DefWindowProc(FHandle, uMsg, wParam, lParam));
   end;
-
-  Result := DefWindowProc(FHandle, uMsg, wParam, lParam);
 end;
 
 procedure TLauncher.ProcessMonitorProcessExited(const Sender: TObject; const ExePath: string; const Remaining: Integer);

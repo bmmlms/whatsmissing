@@ -132,13 +132,9 @@ begin
   FRegisterWaitForSingleObject := GetProcAddress(GetModuleHandle('kernel32.dll'), 'RegisterWaitForSingleObject');
   FUnregisterWait := GetProcAddress(GetModuleHandle('kernel32.dll'), 'UnregisterWait');
 
-  try
-    ModuleHandle := LoadLibraryA('shell32.dll');
-    FSetCurrentProcessExplicitAppUserModelID := GetProcAddress(ModuleHandle, 'SetCurrentProcessExplicitAppUserModelID');
-    FSHGetPropertyStoreForWindow := GetProcAddress(ModuleHandle, 'SHGetPropertyStoreForWindow');
-  finally
-    FreeLibrary(ModuleHandle);
-  end;
+  ModuleHandle := LoadLibraryA('shell32.dll');
+  FSetCurrentProcessExplicitAppUserModelID := GetProcAddress(ModuleHandle, 'SetCurrentProcessExplicitAppUserModelID');
+  FSHGetPropertyStoreForWindow := GetProcAddress(ModuleHandle, 'SHGetPropertyStoreForWindow');
 
   if (not Assigned(FEnumProcesses)) or (not Assigned(FQueryFullProcessImageNameW)) or (not Assigned(FIsWow64Process2)) or (not Assigned(FQueueUserAPC)) or (not Assigned(FAllowSetForegroundWindow)) or
     (not Assigned(FSetCurrentProcessExplicitAppUserModelID)) or (not Assigned(FSHGetPropertyStoreForWindow)) or (not Assigned(FRegisterWaitForSingleObject)) or (not Assigned(FUnregisterWait)) then

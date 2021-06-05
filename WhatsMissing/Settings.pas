@@ -337,14 +337,14 @@ begin
 
   FColorSettings.Add(TResourceColorSetting.Create(8, 'Background of incoming messages', TFunctions.HTMLToColor('ffffff'), ImmersiveLightChromeMedium, ctImmersive,
     [TResourceColorSettingPatch.Create('--incoming-background:#fff;', '--incoming-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--incoming-background-rgb:255,255,255;',
-    '--incoming-background-rgb:%COLOR%;').RBG, TResourceColorSettingPatch.Create('--incoming-background-deeper:#f0f0f0;', '--incoming-background-deeper:#%COLOR%;').Darken,
-    TResourceColorSettingPatch.Create('--incoming-background-deeper-rgb:240,240,240;', '--incoming-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourceColorSettingPatch.Create(
+    '--incoming-background-rgb:%COLOR%;').RBG, TResourceColorSettingPatch.Create('--incoming-background-deeper:#f7f7f7;', '--incoming-background-deeper:#%COLOR%;').Darken,
+    TResourceColorSettingPatch.Create('--incoming-background-deeper-rgb:247,247,247;', '--incoming-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourceColorSettingPatch.Create(
     '--audio-track-incoming:#e6e6e6;', '--audio-track-incoming:#%COLOR%;').Darken3, TResourceColorSettingPatch.Create('--audio-progress-incoming:#31c76a;', '--audio-progress-incoming:#%COLOR%;').Darken10,
     TResourceColorSettingPatch.Create('--audio-progress-played-incoming:#30b6f6;', '--audio-progress-played-incoming:#%COLOR%;').Darken10]));
 
   FColorSettings.Add(TResourceColorSetting.Create(9, 'Background of outgoing messages', TFunctions.HTMLToColor('dcf8c6'), ImmersiveLightChromeWhite, ctImmersive, [TResourceColorSettingPatch.Create(
     '--outgoing-background:#dcf8c6;', '--outgoing-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--outgoing-background-rgb:220,248,198;', '--outgoing-background-rgb:%COLOR%;').RBG,
-    TResourceColorSettingPatch.Create('--outgoing-background-deeper:#cfe9ba;', '--outgoing-background-deeper:#%COLOR%;').Darken, TResourceColorSettingPatch.Create('--outgoing-background-deeper-rgb:207,233,186;',
+    TResourceColorSettingPatch.Create('--outgoing-background-deeper:#d3eebe;', '--outgoing-background-deeper:#%COLOR%;').Darken, TResourceColorSettingPatch.Create('--outgoing-background-deeper-rgb:211,238,190;',
     '--outgoing-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourceColorSettingPatch.Create('--audio-track-outgoing:#c6dfb2;', '--audio-track-outgoing:#%COLOR%;').Darken3,
     TResourceColorSettingPatch.Create('--audio-progress-outgoing:#889a7b;', '--audio-progress-outgoing:#%COLOR%;').Darken10, TResourceColorSettingPatch.Create('--audio-progress-played-outgoing:#2ab5eb;',
     '--audio-progress-played-outgoing:#%COLOR%;').Darken10]));
