@@ -298,13 +298,9 @@ begin
       end;
     end;
     WM_START:
-    begin
       WMStart;
-    end;
     WM_CHILD_PROCESS_STARTED:
-    begin
       FProcessMonitor.AddProcessId(wParam);
-    end;
     WM_MAINWINDOW_CREATED:
     begin
       FMMFLauncher.Read;
@@ -313,9 +309,7 @@ begin
       FMMFLauncher.Write;
     end;
     WM_WINDOW_SHOWN:
-    begin
       ShowWindow(FHandle, SW_HIDE);
-    end;
     WM_NOTIFICATION_ICON:
     begin
       TFunctions.AllowSetForegroundWindow(FMMFLauncher.WhatsAppGuiPid);
@@ -326,7 +320,9 @@ begin
       FExiting := True;
       SendMessage(FHandle, WM_CLOSE, 0, 0);
     end;
-    WM_CLOSE: ;
+    WM_CLOSE:
+      if FExiting then
+        Exit(DefWindowProc(FHandle, uMsg, wParam, lParam));
     WM_NCDESTROY:
     begin
       TFunctions.ClearPropertyStore(FHandle);
