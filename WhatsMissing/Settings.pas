@@ -321,7 +321,7 @@ begin
   FColorSettings.Add(TResourceColorSetting.Create(13, '"Typing..." notification', TFunctions.HTMLToColor('07bc4c'), ImmersiveSaturatedCommandRowPressed, ctImmersive, [TResourceColorSettingPatch.Create('07bc4c')]));
 
   FColorSettings.Add(TResourceColorSetting.Create(14, 'Primary button background', TFunctions.HTMLToColor('05cd51'), ImmersiveControlDefaultLightButtonBackgroundRest, ctImmersive,
-    [TResourceColorSettingPatch.Create('--button-primary-background:#05cd51;', '--button-primary-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-primary-background-hover:#06d253;',
+    [TResourceColorSettingPatch.Create('--button-primary-background:#0aa545;', '--button-primary-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-primary-background-hover:#0aaa47;',
     '--button-primary-background-hover:#%COLOR%;').Darken3]));
 
   FColorSettings.Add(TResourceColorSetting.Create(15, 'Secondary button background', TFunctions.HTMLToColor('ffffff'), ImmersiveControlLightButtonBackgroundRest, ctImmersive,
@@ -329,7 +329,7 @@ begin
     '--button-secondary-background-hover:#%COLOR%;').Darken3]));
 
   FColorSettings.Add(TResourceColorSetting.Create(16, 'Secondary button text', TFunctions.HTMLToColor('07bc4c'), ImmersiveControlLightAppButtonTextRest, ctImmersive, [TResourceColorSettingPatch.Create(
-    '--button-secondary:#07bc4c;', '--button-secondary:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-secondary-hover:#05cd51;', '--button-secondary-hover:#%COLOR%;').Lighten3]));
+    '--button-secondary:#0aa545;', '--button-secondary:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-secondary-hover:#0aaa47;', '--button-secondary-hover:#%COLOR%;').Lighten3]));
 
   FColorSettings.Add(TResourceColorSetting.Create(17, 'Round button background', TFunctions.HTMLToColor('09e85e'), ImmersiveControlLightButtonBackgroundRest, ctImmersive,
     [TResourceColorSettingPatch.Create('--button-round-background:#09e85e;', '--button-round-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-round-background-rgb:8.64769,232.25231,93.88923;',
