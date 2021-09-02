@@ -29,7 +29,7 @@ type
 
   TResourcePatcher = class
   private
-    type
+  type
     TThreadPatchInfo = record
       Search: string;
       Replace: string;
@@ -108,7 +108,6 @@ begin
         RegEx := TRegExpr.Create;
         RegEx.ModifierI := True;
         RegEx.ModifierM := True;
-//        RegEx.ModifierG := True;
         try
           StrLen := Parameters.Result.Length;
           RegEx.Expression := ThreadPatchInfo.Search;
@@ -206,8 +205,7 @@ const
     (Search: '#windows-title-maximize{position:absolute;'; Replace: '#windows-title-maximize{position:absolute;cursor:default;'; ReplaceFlags: []),
     (Search: '#windows-title-close{position:absolute;'; Replace: '#windows-title-close{position:absolute;cursor:default;'; ReplaceFlags: []));
   FJsRegExReplacements: array[0..4] of TRegExReplace = (
-    (Search: 'return (.)\.decrypt\((.)\)\.then\(\(function\((.)\)\{return (.)\.readNode\(new (.)\((.)\)\)';
-    Replace: 'return $1.decrypt($2).then((function($3){ var vv = $4.readNode(new $5($6)); window.wmcall("socket_in", vv); return vv;'),
+    (Search: 'return (.)\.apply\(this,arguments\)}}\(\),this\.write='; Replace: 'return $1.apply(this,arguments).then(function (vv) { window.wmcall("socket_in", vv); return vv; }); }}(),this.write='),
     (Search: 'return (.)\.writeNode\((.),(.)\),(.)\.encrypt\((.)\.toBuffer\(\)\)\}\)\)'; Replace: 'if (!window.wmcall("socket_out", $3)) return; return $1.writeNode($2,$3),$4.encrypt($5.toBuffer())}))'),
     (Search: 'var (.)=this\.parseMsg\((.)\[0\],"relay"\);'; Replace: 'var $1=this.parseMsg($2[0],"relay"); window.wmcall("message", {sent: $1.id.fromMe, jid: $1.id.remote});'),
     (Search: '(.)\.default\.getGlobalSounds\(\)&&\((.)\.id'; Replace: 'window.wmcall("ask_notification_sound", $2.id) &&$1.default.getGlobalSounds()&&($2.id'),
