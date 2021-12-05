@@ -20,8 +20,8 @@
     <VersionInfo>
       <UseVersionInfo Value="True"/>
       <MinorVersionNr Value="3"/>
-      <RevisionNr Value="2"/>
-      <StringTable FileDescription="WhatsMissing Library" ProductName="WhatsMissing" ProductVersion="0.3.2.0"/>
+      <RevisionNr Value="3"/>
+      <StringTable FileDescription="WhatsMissing Library" ProductName="WhatsMissing" ProductVersion="0.3.3.0"/>
     </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="Debug" Default="True"/>
