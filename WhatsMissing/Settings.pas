@@ -332,7 +332,7 @@ begin
     '--button-secondary:#0aa545;', '--button-secondary:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-secondary-hover:#0aaa47;', '--button-secondary-hover:#%COLOR%;').Lighten3]));
 
   FColorSettings.Add(TResourceColorSetting.Create(17, 'Round button background', TFunctions.HTMLToColor('09e85e'), ImmersiveControlLightButtonBackgroundRest, ctImmersive,
-    [TResourceColorSettingPatch.Create('--button-round-background:#09e85e;', '--button-round-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-round-background-rgb:8.64769,232.25231,93.88923;',
+    [TResourceColorSettingPatch.Create('--button-round-background:#09e85e;', '--button-round-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-round-background-rgb:9,232,94;',
     '--button-round-background-rgb:#%COLOR%;').RBG]));
 
   FColorSettings.Add(TResourceColorSetting.Create(8, 'Background of incoming messages', TFunctions.HTMLToColor('ffffff'), ImmersiveLightChromeMedium, ctImmersive,
