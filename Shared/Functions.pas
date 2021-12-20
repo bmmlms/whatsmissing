@@ -69,8 +69,8 @@ type
     class function CreateFileMapping(hFile: HANDLE; lpFileMappingAttributes: LPSECURITY_ATTRIBUTES; flProtect: DWORD; dwMaximumSizeHigh: DWORD; dwMaximumSizeLow: DWORD; Name: string): HANDLE;
     class function OpenFileMapping(dwDesiredAccess: DWORD; bInheritHandle: WINBOOL; Name: string): HANDLE;
 
-    class function GetSpecialFolder(const csidl: ShortInt): string;
-    class function GetTempPath: string;
+    class function GetSpecialFolder(const csidl: ShortInt): string; static;
+    class function GetTempPath: string; static;
     class function HTMLToColor(const Color: string): TColor; static;
     class function ColorToHTML(const Color: TColor): string; static;
     class function ColorToRGBHTML(const Color: TColor): string; static;
