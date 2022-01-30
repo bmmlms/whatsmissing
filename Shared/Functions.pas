@@ -374,7 +374,7 @@ var
   Buf: UnicodeString;
 begin
   Size := 1024;
-  SetLength(Buf, Size);
+  SetLength(Buf, Size * 2);
 
   if FQueryFullProcessImageNameW(ProcessHandle, 0, PWideChar(Buf), @Size) = 0 then
     raise Exception.Create('QueryFullProcessImageNameW() failed: %d'.Format([GetLastError]));

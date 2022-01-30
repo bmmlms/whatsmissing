@@ -22,6 +22,10 @@
         <TextName Value="org.WhatsMissing.WhatsMissing"/>
         <TextDesc Value="WhatsMissing Setup"/>
       </XPManifest>
+      <Resources Count="2">
+        <Resource_0 FileName="..\Resources\WhatsMissing.ico" Type="ICON" ResourceName="MAINICON"/>
+        <Resource_1 FileName="..\Build\SetupResources\Output.bin" Type="RCDATA" ResourceName="FILES"/>
+      </Resources>
     </General>
     <VersionInfo>
       <UseVersionInfo Value="True"/>
@@ -39,6 +43,7 @@
             <Filename Value="..\Build\WhatsMissing_Setup"/>
           </Target>
           <SearchPaths>
+            <Libraries Value="..\SubModules\minlzma\build\minlzlib"/>
             <OtherUnitFiles Value="..\Shared"/>
             <UnitOutputDirectory Value="..\Build\DCU\$(TargetCPU)"/>
           </SearchPaths>
@@ -49,9 +54,12 @@
           </Parsing>
           <CodeGeneration>
             <SmartLinkUnit Value="True"/>
+            <TargetCPU Value="i386"/>
+            <TargetOS Value="win32"/>
             <Optimizations>
               <OptimizationLevel Value="4"/>
             </Optimizations>
+            <SmallerCode Value="True"/>
           </CodeGeneration>
           <Linking>
             <Debugging>
@@ -109,6 +117,7 @@
       <Filename Value="..\Build\WhatsMissing_Setup"/>
     </Target>
     <SearchPaths>
+      <Libraries Value="..\SubModules\minlzma\build\minlzlib"/>
       <OtherUnitFiles Value="..\Shared"/>
       <UnitOutputDirectory Value="..\Build\DCU\$(TargetCPU)"/>
     </SearchPaths>
@@ -151,7 +160,7 @@
     </Other>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="3">
+    <Exceptions Count="3" IgnoreAll="True">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>

@@ -36,10 +36,14 @@ Complete uninstallation is possible using "Programs and Features".
 When WhatsApp is running right click the notification icon to open the settings dialog or toggle "Always on top". The menu entries displayed in the notification icon context menu are also accessible using the title bar context menu.
 
 ### Building
-Install Lazarus IDE and the tools to crosscompile, open any project file and build it. To use the build script "Build.bat" you need to edit its 4th line.
+- Install Lazarus IDE and the tools to crosscompile
+- Install MSYS2 with mingw32 (only required for building the installer)
+
+To use the build script "Build.bat" you need to configure variables at the top of the file.
 
 ### Thanks
 - [Lazarus IDE](https://www.lazarus-ide.org)
 - [Free Pascal](https://www.freepascal.org)
 - [Font Awesome](https://fontawesome.com)
-- [MahdiSafsafi](https://github.com/MahdiSafsafi)
+- [MahdiSafsafi](https://github.com/MahdiSafsafi) for DDetours and ImmersiveColors
+- [Alex Ionescu](https://github.com/ionescu007) for minlzma

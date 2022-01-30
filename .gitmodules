@@ -5,3 +5,6 @@
 	path = SubModules/ImmersiveColors
 	url = https://github.com/MahdiSafsafi/ImmersiveColors
 	branch = next
+[submodule "SubModules/minlzma"]
+	path = SubModules/minlzma
+	url = https://github.com/ionescu007/minlzma.git

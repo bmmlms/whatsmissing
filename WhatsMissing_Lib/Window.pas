@@ -541,16 +541,14 @@ begin
 
   MenuItemInfo.cbSize := SizeOf(MenuItemInfo);
 
-  MenuItemInfo.fMask := MIIM_TYPE or MIIM_ID;
-  MenuItemInfo.fType := MFT_STRING;
+  MenuItemInfo.fMask := MIIM_STRING or MIIM_ID;
   MenuItemInfo.wID := MENU_ALWAYSONTOP;
   MenuItemInfo.dwTypeData := '&Always on top';
   MenuItemInfo.cch := 14;
 
   InsertMenuItemW(Menu, SC_CLOSE, False, @MenuItemInfo);
 
-  MenuItemInfo.fMask := MIIM_TYPE or MIIM_ID;
-  MenuItemInfo.fType := MFT_STRING;
+  MenuItemInfo.fMask := MIIM_STRING or MIIM_ID;
   MenuItemInfo.wID := MENU_SETTINGS;
   MenuItemInfo.dwTypeData := 'S&ettings...';
   MenuItemInfo.cch := 11;

@@ -5,82 +5,85 @@ uses
   Classes,
   Constants,
   Functions,
-  paszlib,
   Paths,
   Registry,
   SysUtils,
   Windows;
 
 {$R *.res}
-{$R resources.rc}
 
-function ExtractStream(InStream: TStream; OutStream: TStream): Integer;
-var
-  Err: Integer;
-  Z: TZStream;
-const
-  MAX_IN_BUF_SIZE = 4096;
-  MAX_OUT_BUF_SIZE = 4096;
-var
-  InputBuffer: array[0..MAX_IN_BUF_SIZE - 1] of Byte;
-  OutputBuffer: array[0..MAX_OUT_BUF_SIZE - 1] of Byte;
-  FlushType: LongInt;
-begin
-  Result := 0;
+{$LINKLIB libminlzlib.a}
 
-  FillChar(Z, SizeOf(Z), 0);
-  FillChar(InputBuffer, SizeOf(InputBuffer), 0);
-  Err := inflateInit(z);
+function XzDecode(InputBuffer: PUInt8; InputSize: UInt32; OutputBuffer: PUInt8; OutputSize: PUInt32): longbool; cdecl; external;
 
-  InStream.Position := 0;
-  while InStream.Position < InStream.Size do
-  begin
-    Z.next_in := @InputBuffer;
-    Z.avail_in := InStream.Read(InputBuffer, MAX_IN_BUF_SIZE);
-
-    if InStream.Position = InStream.Size then
-      FlushType := Z_FINISH
-    else
-      FlushType := Z_SYNC_FLUSH;
-
-    repeat
-      Z.next_out := @OutputBuffer;
-      Z.avail_out := MAX_OUT_BUF_SIZE;
-
-      Err := inflate(Z, FlushType);
-      Result += OutStream.Write(OutputBuffer, MAX_OUT_BUF_SIZE - Z.avail_out);
-      if Err = Z_STREAM_END then
-        Break;
-    until Z.avail_out > 0;
-
-    if (Err <> Z_OK) and (Err <> Z_BUF_ERROR) then
-      break;
+type
+  TFileData = record
+    Name: string;
+    Start: Cardinal;
+    Size: Cardinal;
   end;
 
-  Err := inflateEnd(Z);
-end;
+  TFileDataArray = array of TFileData;
 
-function ExtractResource(const ResourceName, FilePath: string): Boolean;
+function ReadArchive(var Files: TFileDataArray; ArchiveStream: TMemoryStream): Boolean;
 var
+  i: Integer;
   ResStream: TResourceStream;
-  OutStream: TFileStream;
+  OutputSize: UInt32;
+  Count, ByteCount: Cardinal;
 begin
   Result := False;
   try
-    ResStream := TResourceStream.Create(HInstance, ResourceName, RT_RCDATA);
+    ResStream := TResourceStream.Create(HInstance, 'FILES', RT_RCDATA);
     try
-      OutStream := TFileStream.Create(FilePath, fmCreate);
-      try
-        ExtractStream(ResStream, OutStream);
-        Result := True;
-      finally
-        OutStream.Free;
+      Count := ResStream.ReadByte;
+
+      SetLength(Files, Count);
+      ByteCount := 0;
+
+      for i := 0 to Count - 1 do
+      begin
+        Files[i].Name := ResStream.ReadAnsiString;
+        Files[i].Start := ByteCount;
+        Files[i].Size := ResStream.ReadDWord;
+        Inc(ByteCount, Files[i].Size);
       end;
+
+      if not XzDecode(ResStream.Memory + ResStream.Position, ResStream.Size - ResStream.Position, nil, @OutputSize) then
+        Exit;
+
+      ArchiveStream.SetSize(OutputSize);
+
+      if not XzDecode(ResStream.Memory + ResStream.Position, ResStream.Size - ResStream.Position, ArchiveStream.Memory, @OutputSize) then
+        Exit;
+
+      Result := True;
     finally
       ResStream.Free;
     end;
   except
   end;
+end;
+
+function WriteFile(const Files: TFileDataArray; const ArchiveStream: TMemoryStream; const ArchiveFilename, Filename: string): Boolean;
+var
+  i: Integer;
+  FileStream: TFileStream;
+begin
+  Result := False;
+
+  for i := 0 to High(Files) do
+    if Files[i].Name = ArchiveFilename then
+    begin
+      FileStream := TFileStream.Create(Filename, fmCreate);
+      try
+        ArchiveStream.Position := Files[i].Start;
+        FileStream.CopyFrom(ArchiveStream, Files[i].Size);
+      finally
+        FileStream.Free;
+      end;
+      Exit(True);
+    end;
 end;
 
 procedure CreateUninstallEntry(const Executable: string);
@@ -113,28 +116,38 @@ var
   Res: TStartProcessRes;
   WhatsMissingExecutable: string;
   WhatsAppExes: TStringList;
+  Files: TFileDataArray;
+  ArchiveStream: TMemoryStream;
 begin
   if not DirectoryExists(TPaths.WhatsMissingDir) then
     if not CreateDir(TPaths.WhatsMissingDir) then
       raise Exception.Create('Error creating installation directory');
 
-  if not ExtractResource('EXE_32', ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_32])) then
-    raise Exception.Create('Error installing executable');
+  ArchiveStream := TMemoryStream.Create;
+  try
+    if not ReadArchive(Files, ArchiveStream) then
+      raise Exception.Create('Error extracting files');
 
-  if not ExtractResource('LIB_32', ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_LIBRARYNAME_32])) then
-    raise Exception.Create('Error installing library');
-
-  if TFunctions.IsWindows64Bit then
-  begin
-    WhatsMissingExecutable := ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_64]);
-
-    if not ExtractResource('EXE_64', ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_64])) then
+    if not WriteFile(Files, ArchiveStream, 'EXE_32', ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_32])) then
       raise Exception.Create('Error installing executable');
 
-    if not ExtractResource('LIB_64', ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_LIBRARYNAME_64])) then
+    if not WriteFile(Files, ArchiveStream, 'LIB_32', ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_LIBRARYNAME_32])) then
       raise Exception.Create('Error installing library');
-  end else
-    WhatsMissingExecutable := ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_32]);
+
+    if TFunctions.IsWindows64Bit then
+    begin
+      WhatsMissingExecutable := ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_64]);
+
+      if not WriteFile(Files, ArchiveStream, 'EXE_64', ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_64])) then
+        raise Exception.Create('Error installing executable');
+
+      if not WriteFile(Files, ArchiveStream, 'LIB_64', ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_LIBRARYNAME_64])) then
+        raise Exception.Create('Error installing library');
+    end else
+      WhatsMissingExecutable := ConcatPaths([TPaths.WhatsMissingDir, WHATSMISSING_EXENAME_32]);
+  finally
+    ArchiveStream.Free;
+  end;
 
   WhatsAppExes := TStringList.Create;
   try
