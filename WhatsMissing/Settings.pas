@@ -293,19 +293,16 @@ begin
   FNotificationIconBadgeTextColor := TColorSetting.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted, ctImmersive);
 
   // --teal-lighter
-  FColorSettings.Add(TResourceColorSetting.Create(1, 'Titlebar', TFunctions.HTMLToColor('00bfa5'), ImmersiveSystemAccent, ctImmersive, [TResourceColorSettingPatch.Create('00bfa5')]));
+  FColorSettings.Add(TResourceColorSetting.Create(1, 'Titlebar', TFunctions.HTMLToColor('00a884'), ImmersiveSystemAccent, ctImmersive, [TResourceColorSettingPatch.Create('00a884')]));
 
   // --badge-pending, --teal, --active-tab-marker, --app-background-stripe, --checkbox-background, --highlight, --panel-background-colored-deeper
   FColorSettings.Add(TResourceColorSetting.Create(10, 'Panel background', TFunctions.HTMLToColor('009688'), ImmersiveSaturatedBackground, ctImmersive, [TResourceColorSettingPatch.Create('009688')]));
 
   // --intro-border
-  FColorSettings.Add(TResourceColorSetting.Create(2, 'Intro border', TFunctions.HTMLToColor('4adf83'), ImmersiveLightBorder, ctImmersive, [TResourceColorSettingPatch.Create('4adf83')]));
+  FColorSettings.Add(TResourceColorSetting.Create(2, 'Intro border', TFunctions.HTMLToColor('25d366'), ImmersiveLightBorder, ctImmersive, [TResourceColorSettingPatch.Create('25d366')]));
 
   // --progress-primary
-  FColorSettings.Add(TResourceColorSetting.Create(3, 'Progressbar', TFunctions.HTMLToColor('00d9bb'), ImmersiveControlLightProgressForeground, ctImmersive, [TResourceColorSettingPatch.Create('00d9bb')]));
-
-  // --unread-marker-background
-  FColorSettings.Add(TResourceColorSetting.Create(4, 'Unread message badge', TFunctions.HTMLToColor('06d755'), ImmersiveLightWUError, ctImmersive, [TResourceColorSettingPatch.Create('06d755')]));
+  FColorSettings.Add(TResourceColorSetting.Create(3, 'Progressbar', TFunctions.HTMLToColor('00c298'), ImmersiveControlLightProgressForeground, ctImmersive, [TResourceColorSettingPatch.Create('00c298')]));
 
   FColorSettings.Add(FNotificationIconBadgeColor);
 
@@ -318,10 +315,13 @@ begin
   FColorSettings.Add(TResourceColorSetting.Create(12, 'Acknowledged icons', TFunctions.HTMLToColor('4fc3f7'), ImmersiveLightWUNormal, ctImmersive, [TResourceColorSettingPatch.Create('4fc3f7')]));
 
   // --typing
-  FColorSettings.Add(TResourceColorSetting.Create(13, '"Typing..." notification', TFunctions.HTMLToColor('07bc4c'), ImmersiveSaturatedCommandRowPressed, ctImmersive, [TResourceColorSettingPatch.Create('07bc4c')]));
+  FColorSettings.Add(TResourceColorSetting.Create(13, '"Typing..." notification', TFunctions.HTMLToColor('1fa855'), ImmersiveSaturatedCommandRowPressed, ctImmersive, [TResourceColorSettingPatch.Create('1fa855')]));
+
+  FColorSettings.Add(TResourceColorSetting.Create(4, 'Unread message badge', TFunctions.HTMLToColor('25d366'), ImmersiveLightWUError, ctImmersive, [TResourceColorSettingPatch.Create('--unread-marker-background:#25d366;',
+    '--unread-marker-background:#%COLOR%;')]));
 
   FColorSettings.Add(TResourceColorSetting.Create(14, 'Primary button background', TFunctions.HTMLToColor('05cd51'), ImmersiveControlDefaultLightButtonBackgroundRest, ctImmersive,
-    [TResourceColorSettingPatch.Create('--button-primary-background:#0aa545;', '--button-primary-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-primary-background-hover:#0aaa47;',
+    [TResourceColorSettingPatch.Create('--button-primary-background:#008069;', '--button-primary-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-primary-background-hover:#017561;',
     '--button-primary-background-hover:#%COLOR%;').Darken3]));
 
   FColorSettings.Add(TResourceColorSetting.Create(15, 'Secondary button background', TFunctions.HTMLToColor('ffffff'), ImmersiveControlLightButtonBackgroundRest, ctImmersive,
@@ -329,24 +329,24 @@ begin
     '--button-secondary-background-hover:#%COLOR%;').Darken3]));
 
   FColorSettings.Add(TResourceColorSetting.Create(16, 'Secondary button text', TFunctions.HTMLToColor('07bc4c'), ImmersiveControlLightAppButtonTextRest, ctImmersive, [TResourceColorSettingPatch.Create(
-    '--button-secondary:#0aa545;', '--button-secondary:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-secondary-hover:#0aaa47;', '--button-secondary-hover:#%COLOR%;').Lighten3]));
+    '--button-secondary:#008069;', '--button-secondary:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-secondary-hover:#017561;', '--button-secondary-hover:#%COLOR%;').Lighten3]));
 
   FColorSettings.Add(TResourceColorSetting.Create(17, 'Round button background', TFunctions.HTMLToColor('09e85e'), ImmersiveControlLightButtonBackgroundRest, ctImmersive,
-    [TResourceColorSettingPatch.Create('--button-round-background:#09e85e;', '--button-round-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-round-background-rgb:9,232,94;',
+    [TResourceColorSettingPatch.Create('--button-round-background:#00a884;', '--button-round-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-round-background-rgb:0,168,132;',
     '--button-round-background-rgb:#%COLOR%;').RBG]));
 
   FColorSettings.Add(TResourceColorSetting.Create(8, 'Background of incoming messages', TFunctions.HTMLToColor('ffffff'), ImmersiveLightChromeMedium, ctImmersive,
     [TResourceColorSettingPatch.Create('--incoming-background:#fff;', '--incoming-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--incoming-background-rgb:255,255,255;',
-    '--incoming-background-rgb:%COLOR%;').RBG, TResourceColorSettingPatch.Create('--incoming-background-deeper:#f7f7f7;', '--incoming-background-deeper:#%COLOR%;').Darken,
-    TResourceColorSettingPatch.Create('--incoming-background-deeper-rgb:247,247,247;', '--incoming-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourceColorSettingPatch.Create(
-    '--audio-track-incoming:#e6e6e6;', '--audio-track-incoming:#%COLOR%;').Darken3, TResourceColorSettingPatch.Create('--audio-progress-incoming:#31c76a;', '--audio-progress-incoming:#%COLOR%;').Darken10,
-    TResourceColorSettingPatch.Create('--audio-progress-played-incoming:#30b6f6;', '--audio-progress-played-incoming:#%COLOR%;').Darken10]));
+    '--incoming-background-rgb:%COLOR%;').RBG, TResourceColorSettingPatch.Create('--incoming-background-deeper:#f5f6f6;', '--incoming-background-deeper:#%COLOR%;').Darken,
+    TResourceColorSettingPatch.Create('--incoming-background-deeper-rgb:245,246,246;', '--incoming-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourceColorSettingPatch.Create(
+    '--audio-track-incoming:#e7e8e9;', '--audio-track-incoming:#%COLOR%;').Darken3, TResourceColorSettingPatch.Create('--audio-progress-incoming:#4ada80;', '--audio-progress-incoming:#%COLOR%;').Darken10,
+    TResourceColorSettingPatch.Create('--audio-progress-played-incoming:#30b0e8;', '--audio-progress-played-incoming:#%COLOR%;').Darken10]));
 
   FColorSettings.Add(TResourceColorSetting.Create(9, 'Background of outgoing messages', TFunctions.HTMLToColor('dcf8c6'), ImmersiveLightChromeWhite, ctImmersive, [TResourceColorSettingPatch.Create(
-    '--outgoing-background:#dcf8c6;', '--outgoing-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--outgoing-background-rgb:220,248,198;', '--outgoing-background-rgb:%COLOR%;').RBG,
-    TResourceColorSettingPatch.Create('--outgoing-background-deeper:#d3eebe;', '--outgoing-background-deeper:#%COLOR%;').Darken, TResourceColorSettingPatch.Create('--outgoing-background-deeper-rgb:211,238,190;',
-    '--outgoing-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourceColorSettingPatch.Create('--audio-track-outgoing:#c6dfb2;', '--audio-track-outgoing:#%COLOR%;').Darken3,
-    TResourceColorSettingPatch.Create('--audio-progress-outgoing:#889a7b;', '--audio-progress-outgoing:#%COLOR%;').Darken10, TResourceColorSettingPatch.Create('--audio-progress-played-outgoing:#2ab5eb;',
+    '--outgoing-background:#d9fdd3;', '--outgoing-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--outgoing-background-rgb:217,253,211;', '--outgoing-background-rgb:%COLOR%;').RBG,
+    TResourceColorSettingPatch.Create('--outgoing-background-deeper:#d1f4cc;', '--outgoing-background-deeper:#%COLOR%;').Darken, TResourceColorSettingPatch.Create('--outgoing-background-deeper-rgb:209,244,204;',
+    '--outgoing-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourceColorSettingPatch.Create('--audio-track-outgoing:#c5e6c1;', '--audio-track-outgoing:#%COLOR%;').Darken3,
+    TResourceColorSettingPatch.Create('--audio-progress-outgoing:#8da78f;', '--audio-progress-outgoing:#%COLOR%;').Darken10, TResourceColorSettingPatch.Create('--audio-progress-played-outgoing:#29afdf;',
     '--audio-progress-played-outgoing:#%COLOR%;').Darken10]));
 
   FColorSettings.Add(TResourceColorSetting.Create(5, 'Minimize button hover color', TFunctions.HTMLToColor('00ab97'), ImmersiveControlDefaultLightButtonBackgroundHover, ctImmersive,
