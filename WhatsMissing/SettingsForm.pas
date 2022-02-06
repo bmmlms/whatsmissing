@@ -54,6 +54,7 @@ type
     btnSave: TBitBtn;
     chkShowUnreadMessagesBadge: TCheckBox;
     chkExcludeUnreadMessagesMutedChats: TCheckBox;
+    chkUsePreRenderedOverlays: TCheckBox;
     chkSuppressConsecutiveNotificationSounds: TCheckBox;
     chkSuppressPresenceAvailable: TCheckBox;
     chkSuppressPresenceComposing: TCheckBox;
@@ -126,6 +127,7 @@ begin
 
   chkShowNotificationIcon.Checked := FSettings.ShowNotificationIcon;
   chkShowUnreadMessagesBadge.Checked := FSettings.ShowUnreadMessagesBadge;
+  chkUsePreRenderedOverlays.Checked := FSettings.UsePreRenderedOverlays;
   chkExcludeUnreadMessagesMutedChats.Checked := FSettings.ExcludeUnreadMessagesMutedChats;
   chkHideMaximize.Checked := FSettings.HideMaximize;
   chkSuppressPresenceAvailable.Checked := FSettings.SuppressPresenceAvailable;
@@ -135,6 +137,7 @@ begin
   CheckBoxChange(nil);
 
   chkShowUnreadMessagesBadge.BorderSpacing.Left := CheckBoxRect.Width;
+  chkUsePreRenderedOverlays.BorderSpacing.Left := CheckBoxRect.Width;
   chkExcludeUnreadMessagesMutedChats.BorderSpacing.Left := CheckBoxRect.Width;
 
   for i := FSettings.ColorSettings.Count - 1 downto 0 do
@@ -185,6 +188,7 @@ begin
 
     SaveSettings.ShowNotificationIcon := chkShowNotificationIcon.Checked;
     SaveSettings.ShowUnreadMessagesBadge := chkShowUnreadMessagesBadge.Checked;
+    SaveSettings.UsePreRenderedOverlays := chkUsePreRenderedOverlays.Checked;
     SaveSettings.ExcludeUnreadMessagesMutedChats := chkExcludeUnreadMessagesMutedChats.Checked;
     SaveSettings.HideMaximize := chkHideMaximize.Checked;
     SaveSettings.SuppressPresenceAvailable := chkSuppressPresenceAvailable.Checked;
@@ -247,7 +251,10 @@ begin
     chkShowUnreadMessagesBadge.Enabled := chkShowNotificationIcon.Checked;
 
   if (Sender = nil) or (Sender = chkShowNotificationIcon) or (Sender = chkShowUnreadMessagesBadge) then
+  begin
+    chkUsePreRenderedOverlays.Enabled := chkShowNotificationIcon.Checked and chkShowUnreadMessagesBadge.Checked;
     chkExcludeUnreadMessagesMutedChats.Enabled := chkShowNotificationIcon.Checked and chkShowUnreadMessagesBadge.Checked;
+  end;
 end;
 
 { TColorSettingControl }

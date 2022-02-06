@@ -3,10 +3,12 @@ unit Window;
 interface
 
 uses
+  ColorFunctions,
   Constants,
   Functions,
   Log,
   MMF,
+  NotificationOverlays,
   Paths,
   ShellAPI,
   SysUtils,
@@ -90,7 +92,8 @@ type
     procedure ModifySystemMenu;
     procedure CreateNotificationMenu;
     procedure SetAlwaysOnTop(const Enabled: Boolean);
-    function CreateNotificationIcon(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
+    function CreateNotificationIconPreRendered(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
+    function CreateNotificationIconDrawn(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
   public
     constructor Create(const hwnd: HWND; const Log: TLog);
     destructor Destroy; override;
@@ -420,7 +423,10 @@ begin
 
   FMMFLauncher.Chats.GetUnreadChats(Days, Length(FNotifyData.szTip), FMMFLauncher.ExcludeUnreadMessagesMutedChats, UnreadMessageCount, ToolTip);
 
-  FNotifyData.hIcon := CreateNotificationIcon(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadMessageCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor);
+  if FMMFLauncher.UsePreRenderedOverlays then
+    FNotifyData.hIcon := CreateNotificationIconPreRendered(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadMessageCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor)
+  else
+    FNotifyData.hIcon := CreateNotificationIconDrawn(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadMessageCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor);
 
   StrPLCopy(FNotifyData.szTip, ToolTip, Length(FNotifyData.szTip) - 1);
 
@@ -576,7 +582,134 @@ begin
   AppendMenu(FNotificationMenu, MF_STRING, MENU_EXIT, '&Close');
 end;
 
-function TWindow.CreateNotificationIcon(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
+function TWindow.CreateNotificationIconPreRendered(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
+type
+  TByteArray = array of Byte;
+
+  procedure Draw(const Dst, Src: Pointer; X, Y, DstWidth, SrcWidth, SrcHeight: Integer);
+  var
+    SrcCnt: Integer;
+    DstRgb, SrcRgb: PRGBQUAD;
+    OffsetX: UInt32;
+    A: Byte;
+  begin
+    OffsetX := X * SizeOf(TRGBQUAD);
+
+    SrcRgb := Src;
+    DstRgb := (Dst + Y * DstWidth * SizeOf(TRGBQUAD)) + OffsetX;
+
+    SrcCnt := 0;
+    while SrcRgb < Src + (SrcWidth * SrcHeight * SizeOF(TRGBQUAD)) do
+    begin
+      A := Trunc(SrcRgb.rgbReserved + (DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255));
+
+      if A > 0 then
+      begin
+        DstRgb.rgbRed := Trunc((SrcRgb.rgbRed * SrcRgb.rgbReserved + DstRgb.rgbRed * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / A);
+        DstRgb.rgbGreen := Trunc((SrcRgb.rgbGreen * SrcRgb.rgbReserved + DstRgb.rgbGreen * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / A);
+        DstRgb.rgbBlue := Trunc((SrcRgb.rgbBlue * SrcRgb.rgbReserved + DstRgb.rgbBlue * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / A);
+      end;
+
+      DstRgb.rgbReserved := A;
+
+      SrcRgb := PRGBQUAD(NativeUInt(SrcRgb) + SizeOf(TRGBQUAD));
+      Inc(SrcCnt);
+
+      if SrcCnt mod SrcWidth = 0 then
+      begin
+        Inc(Y);
+        DstRgb := (Dst + Y * DstWidth * SizeOf(TRGBQUAD)) + OffsetX;
+      end else
+        DstRgb := PRGBQUAD(NativeUInt(DstRgb) + SizeOf(TRGBQUAD));
+    end;
+  end;
+
+  function ColorizeGray(const BitmapStart, BitmapEnd: Pointer; const Color, TextColor: TColor): TByteArray;
+  type
+    TGATup = record
+    Gray: Byte;
+    Alpha: Byte;
+  end;
+    PGATup = ^TGATup;
+  var
+    HB, SB, HF, SF, L: Byte;
+    GATup: PGATup;
+    RGBQuad: PRGBQUAD;
+  begin
+    SetLength(Result, (BitmapEnd - BitmapStart) * SizeOf(TGATup));
+
+    ColorToHLS(Color, HB, L, SB);
+    ColorToHLS(TextColor, HF, L, SF);
+
+    GATup := BitmapStart;
+    RGBQuad := @Result[0];
+    while GATup < BitmapEnd do
+    begin
+      if GATup.Gray > $C0 then
+        HLStoRGB(HF, GATup.Gray, SF, RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue)
+      else
+        HLStoRGB(HB, GATup.Gray, SB, RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue);
+
+      RGBQuad.rgbReserved := GATup.Alpha;
+
+      GATup := PGATup(NativeUInt(GATup) + SizeOf(TGATup));
+      RGBQuad := PRGBQUAD(NativeUInt(RGBQuad) + SizeOf(TRGBQUAD));
+    end;
+  end;
+
+var
+  CirclePos: Integer;
+  DC, Bmp, Pen, PenOld, Brush, BrushOld, Icon: Handle;
+  TransparentColor, PenColor, BrushColor: COLORREF;
+  BitmapStart, BitmapEnd: Pointer;
+  IconInfo: TIconInfo;
+  BitmapHeader: BITMAPV5HEADER;
+  BitmapInfo: BITMAP;
+  Chat: TChat;
+  NOI: TNotificationOverlayInfo;
+  NotificationBitmap: TByteArray;
+begin
+  if ExtractIconExW(PWideChar(UnicodeString(TPaths.ExePath)), 0, nil, @Icon, 1) <> 1 then
+    raise Exception.Create('ExtractIconExW() failed');
+
+  GetIconInfo(Icon, IconInfo);
+
+  GetObject(IconInfo.hbmColor, SizeOf(BitmapInfo), @BitmapInfo);
+
+  DeleteObject(IconInfo.hbmColor);
+  DeleteObject(IconInfo.hbmMask);
+
+  ZeroMemory(@BitmapHeader, SizeOf(BitmapHeader));
+  BitmapHeader.bV5Size := SizeOf(BitmapHeader);
+  BitmapHeader.bV5Width := BitmapInfo.bmWidth;
+  BitmapHeader.bV5Height := -BitmapInfo.bmHeight;
+  BitmapHeader.bV5Planes := 1;
+  BitmapHeader.bV5BitCount := 32;
+  BitmapHeader.bV5Compression := BI_RGB;
+
+  DC := CreateCompatibleDC(0);
+  Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
+
+  SelectObject(DC, Bmp);
+  DrawIconEx(DC, 0, 0, Icon, BitmapInfo.bmWidth, BitmapInfo.bmHeight, 0, 0, DI_NORMAL);
+
+  NOI := GetNotificationOverlay(UnreadCount);
+  NotificationBitmap := ColorizeGray(NOI.Data, Pointer(NativeUInt(NOI.Data) + (NOI.Width * NOI.Height * 2)), BackgroundColor, TextColor);
+  Draw(BitmapStart, @NotificationBitmap[0], BitmapInfo.bmWidth - NOI.Width, BitmapInfo.bmHeight - NOI.Height, BitmapInfo.bmWidth, NOI.Width, NOI.Height);
+
+  IconInfo.fIcon := True;
+  IconInfo.xHotspot := 0;
+  IconInfo.yHotspot := 0;
+  IconInfo.hbmColor := Bmp;
+  IconInfo.hbmMask := Bmp;
+
+  Result := CreateIconIndirect(IconInfo);
+
+  DeleteDC(DC);
+  DeleteObject(Bmp);
+end;
+
+function TWindow.CreateNotificationIconDrawn(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
 
 type
   TByteArray = array of Byte;

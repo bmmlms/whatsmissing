@@ -103,6 +103,7 @@ type
 
     FShowNotificationIcon: Boolean;
     FShowUnreadMessagesBadge: Boolean;
+    FUsePreRenderedOverlays: Boolean;
     FExcludeUnreadMessagesMutedChats: Boolean;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
@@ -129,6 +130,7 @@ type
 
     property ShowNotificationIcon: Boolean read FShowNotificationIcon write FShowNotificationIcon;
     property ShowUnreadMessagesBadge: Boolean read FShowUnreadMessagesBadge write FShowUnreadMessagesBadge;
+    property UsePreRenderedOverlays: Boolean read FUsePreRenderedOverlays write FUsePreRenderedOverlays;
     property ExcludeUnreadMessagesMutedChats: Boolean read FExcludeUnreadMessagesMutedChats write FExcludeUnreadMessagesMutedChats;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
@@ -185,6 +187,7 @@ begin
         FLastUsedWhatsAppHash := JSONObject.Get('LastUsedWhatsAppHash', FLastUsedWhatsAppHash);
         FShowNotificationIcon := JSONObject.Get('ShowNotificationIcon', FShowNotificationIcon);
         FShowUnreadMessagesBadge := JSONObject.Get('ShowUnreadMessagesBadge', FShowUnreadMessagesBadge);
+        FUsePreRenderedOverlays := JSONObject.Get('UsePreRenderedOverlays', FUsePreRenderedOverlays);
         FExcludeUnreadMessagesMutedChats := JSONObject.Get('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
         FHideMaximize := JSONObject.Get('HideMaximize', FHideMaximize);
         FAlwaysOnTop := JSONObject.Get('AlwaysOnTop', FAlwaysOnTop);
@@ -233,6 +236,7 @@ begin
     JSONObject.Add('LastUsedWhatsAppHash', FLastUsedWhatsAppHash);
     JSONObject.Add('ShowNotificationIcon', FShowNotificationIcon);
     JSONObject.Add('ShowUnreadMessagesBadge', FShowUnreadMessagesBadge);
+    JSONObject.Add('UsePreRenderedOverlays', FUsePreRenderedOverlays);
     JSONObject.Add('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
     JSONObject.Add('HideMaximize', FHideMaximize);
     JSONObject.Add('AlwaysOnTop', FAlwaysOnTop);
@@ -270,6 +274,7 @@ procedure TSettings.CopyToMMF(MMF: TMMFLauncher);
 begin
   MMF.ShowNotificationIcon := FShowNotificationIcon;
   MMF.ShowUnreadMessagesBadge := FShowUnreadMessagesBadge;
+  MMF.UsePreRenderedOverlays := FUsePreRenderedOverlays;
   MMF.ExcludeUnreadMessagesMutedChats := FExcludeUnreadMessagesMutedChats;
   MMF.NotificationIconBadgeColor := ColorToRGB(FNotificationIconBadgeColor.GetColor(caNone));
   MMF.NotificationIconBadgeTextColor := ColorToRGB(FNotificationIconBadgeTextColor.GetColor(caNone));
@@ -360,6 +365,7 @@ begin
 
   FShowNotificationIcon := True;
   FShowUnreadMessagesBadge := True;
+  FUsePreRenderedOverlays := True;
   FExcludeUnreadMessagesMutedChats := False;
   FHideMaximize := False;
   FAlwaysOnTop := False;

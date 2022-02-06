@@ -44,6 +44,7 @@ To use the build script "Build.bat" you need to configure variables at the top o
 ### Thanks
 - [Lazarus IDE](https://www.lazarus-ide.org)
 - [Free Pascal](https://www.freepascal.org)
-- [Font Awesome](https://fontawesome.com)
+- [Font Awesome](https://fontawesome.com) for application icon
+- [Yusuke Kamiyamane](https://p.yusukekamiyamane.com/about) for Fugue Icons
 - [MahdiSafsafi](https://github.com/MahdiSafsafi) for DDetours and ImmersiveColors
 - [Alex Ionescu](https://github.com/ionescu007) for minlzma

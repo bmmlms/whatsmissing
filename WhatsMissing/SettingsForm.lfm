@@ -20,7 +20,6 @@ object frmSettings: TfrmSettings
   OnKeyDown = FormKeyDown
   OnShow = FormShow
   Position = poScreenCenter
-  LCLVersion = '2.0.12.0'
   object pnlSave: TPanel
     Left = 4
     Height = 32
@@ -74,7 +73,7 @@ object frmSettings: TfrmSettings
       object chkHideMaximize: TCheckBox
         Left = 4
         Height = 19
-        Top = 67
+        Top = 88
         Width = 377
         Align = alTop
         Caption = 'Hide maximize button'
@@ -83,7 +82,7 @@ object frmSettings: TfrmSettings
       object chkSuppressPresenceAvailable: TCheckBox
         Left = 4
         Height = 19
-        Top = 88
+        Top = 109
         Width = 377
         Align = alTop
         Caption = 'Suppress outbound online notifications'
@@ -92,7 +91,7 @@ object frmSettings: TfrmSettings
       object chkSuppressPresenceComposing: TCheckBox
         Left = 4
         Height = 19
-        Top = 109
+        Top = 130
         Width = 377
         Align = alTop
         Caption = 'Suppress outbound typing notifications'
@@ -101,7 +100,7 @@ object frmSettings: TfrmSettings
       object chkSuppressConsecutiveNotificationSounds: TCheckBox
         Left = 4
         Height = 19
-        Top = 130
+        Top = 151
         Width = 377
         Align = alTop
         Caption = 'Suppress consecutive notification sounds'
@@ -120,20 +119,30 @@ object frmSettings: TfrmSettings
       object chkExcludeUnreadMessagesMutedChats: TCheckBox
         Left = 4
         Height = 19
-        Top = 46
+        Top = 67
         Width = 377
         Align = alTop
         Caption = 'Exclude unread messages of muted chats'
         TabOrder = 6
       end
+      object chkUsePreRenderedOverlays: TCheckBox
+        Left = 4
+        Height = 19
+        Top = 46
+        Width = 377
+        Align = alTop
+        Caption = 'Use pre-rendered overlays for messages badge'
+        OnChange = CheckBoxChange
+        TabOrder = 7
+      end
     end
     object tbsColors: TTabSheet
       Caption = 'Colors'
-      ClientHeight = 292
+      ClientHeight = 284
       ClientWidth = 385
       object sbColors: TScrollBox
         Left = 0
-        Height = 292
+        Height = 284
         Top = 0
         Width = 385
         HorzScrollBar.Page = 1
