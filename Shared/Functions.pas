@@ -195,7 +195,7 @@ end;
 
 class function TFunctions.GetSpecialFolder(const csidl: ShortInt): string;
 var
-  Buf: UnicodeString;
+  Buf: UnicodeString = '';
 begin
   SetLength(Buf, 1024);
   if Failed(SHGetFolderPathW(0, csidl, 0, SHGFP_TYPE_CURRENT, PWideChar(Buf))) then
@@ -205,7 +205,7 @@ end;
 
 class function TFunctions.GetTempPath: string;
 var
-  Buf: UnicodeString;
+  Buf: UnicodeString = '';
 begin
   SetLength(Buf, MAX_PATH + 1);
   SetLength(Buf, GetTempPathW(Length(Buf), PWideChar(Buf)));
@@ -215,16 +215,42 @@ end;
 class function TFunctions.HTMLToColor(const Color: string): TColor;
 var
   R, G, B: Byte;
+  Arr: TStringArray;
 begin
-  R := StrToInt('$' + Copy(Color, 1, 2));
-  G := StrToInt('$' + Copy(Color, 3, 2));
-  B := StrToInt('$' + Copy(Color, 5, 2));
-  Result := RGB(R, G, B);
+  if Color[1] = '#' then
+  begin
+    if Color.Length = 4 then
+    begin
+      R := StrToInt('$' + Color[2] + Color[2]);
+      G := StrToInt('$' + Color[3] + Color[3]);
+      B := StrToInt('$' + Color[4] + Color[4]);
+      Exit(RGB(R, G, B));
+    end
+    else if Color.Length = 7 then
+    begin
+      R := StrToInt('$' + Copy(Color, 2, 2));
+      G := StrToInt('$' + Copy(Color, 4, 2));
+      B := StrToInt('$' + Copy(Color, 6, 2));
+      Exit(RGB(R, G, B));
+    end;
+  end else
+  begin
+    Arr := Color.Split([',']);
+    if Length(Arr) = 3 then
+    begin
+      R := StrToIntDef(Arr[0], 0);
+      G := StrToIntDef(Arr[1], 0);
+      B := StrToIntDef(Arr[2], 0);
+      Exit(RGB(R, G, B));
+    end;
+  end;
+
+  raise Exception.Create('Invalid color');
 end;
 
 class function TFunctions.ColorToHTML(const Color: TColor): string;
 begin
-  Result := '%.2x%.2x%.2x'.Format([GetRValue(Color), GetGValue(Color), GetBValue(Color)]);
+  Result := '#%.2x%.2x%.2x'.Format([GetRValue(Color), GetGValue(Color), GetBValue(Color)]);
 end;
 
 class function TFunctions.ColorToRGBHTML(const Color: TColor): string;
@@ -245,7 +271,8 @@ var
   LL, TargetMemory: Pointer;
   InjectorPath: string;
   LibraryPath: UnicodeString;
-  ExitCode, Written: DWORD;
+  ExitCode: DWORD = 0;
+  Written: DWORD;
   Res: TStartProcessRes;
 begin
   Result := False;
@@ -285,7 +312,7 @@ class function TFunctions.SetPropertyStore(const Handle: THandle; const ExePath,
 var
   Res: HRESULT;
   PS: IPropertyStore;
-  P: Pointer;
+  P: Pointer = nil;
   Variant: TPropVariant;
 begin
   Result := True;
@@ -325,7 +352,7 @@ class function TFunctions.ClearPropertyStore(const Handle: THandle): Boolean;
 var
   Res: HRESULT;
   PS: IPropertyStore;
-  P: Pointer;
+  P: Pointer = nil;
   Variant: TPropVariant;
 begin
   Result := True;
@@ -371,7 +398,7 @@ end;
 class function TFunctions.GetExePath(ProcessHandle: THandle): string;
 var
   Size: DWORD;
-  Buf: UnicodeString;
+  Buf: UnicodeString = '';
 begin
   Size := 1024;
   SetLength(Buf, Size * 2);
@@ -418,7 +445,7 @@ class function TFunctions.StartProcess(const ExePath: string; Args: string; cons
 var
   Flags: DWORD;
   SI: Windows.STARTUPINFOW;
-  PI: Windows.PROCESS_INFORMATION;
+  PI: Windows.PROCESS_INFORMATION = (hProcess: 0; hThread: 0; dwProcessId: 0; dwThreadId: 0);
 begin
   ZeroMemory(@SI, SizeOf(SI));
   SI.cb := SizeOf(SI);
@@ -474,8 +501,9 @@ class function TFunctions.GetRunningExePids(const FilePath: string): TCardinalAr
 const
   PidCount: DWORD = 2048;
 var
-  Pids: array of DWORD;
-  Pid, cbNeeded: DWORD;
+  Pids: array of DWORD = [];
+  Pid: DWORD;
+  cbNeeded: DWORD = 0;
   ProcHandle: THandle;
 begin
   Result := [];
@@ -508,7 +536,7 @@ end;
 
 class function TFunctions.GetRunningWhatsApp: TWindowProcessRes;
 var
-  PID: DWORD;
+  PID: DWORD = 0;
   ProcHandle: THandle;
   ExePath: string;
 begin
@@ -785,10 +813,10 @@ end;
 class function TFunctions.GetFileVersion(const FileName: string): string;
 var
   VerInfoSize: Integer;
-  VerValueSize: DWord;
-  Dummy: DWord;
+  VerValueSize: DWord = 0;
+  Dummy: DWord = 0;
   VerInfo: Pointer;
-  VerValue: PVSFixedFileInfo;
+  VerValue: PVSFixedFileInfo = nil;
 begin
   VerInfoSize := GetFileVersionInfoSizeW(PWideChar(UnicodeString(FileName)), Dummy);
   if VerInfoSize <> 0 then

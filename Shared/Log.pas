@@ -32,7 +32,7 @@ implementation
 
 constructor TLog.Create(const FileName: string);
 var
-  W: Cardinal;
+  W: Cardinal = 0;
 begin
   FFileName := FileName;
   FHandle := TFunctions.CreateFile(FileName, FILE_APPEND_DATA, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
@@ -64,7 +64,7 @@ end;
 
 procedure TLog.Write(const Msg: string);
 var
-  W: Cardinal;
+  W: Cardinal = 0;
   Bytes: TBytes;
 begin
   if FHandle = 0 then

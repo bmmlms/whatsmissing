@@ -15,6 +15,7 @@ type
 
   TASARHeader = class
   private
+    FOwnsData: Boolean;
     FData: TJSONObject;
     FContentOffset: Cardinal;
   public
@@ -141,7 +142,7 @@ implementation
 
 constructor TASARHeader.Create;
 begin
-
+  FOwnsData := True;
 end;
 
 constructor TASARHeader.Create(const Data: TJSONObject);
@@ -151,7 +152,7 @@ end;
 
 destructor TASARHeader.Destroy;
 begin
-  if Assigned(FData) then
+  if FOwnsData and Assigned(FData) then
     FData.Free;
 
   inherited Destroy;
@@ -160,7 +161,7 @@ end;
 procedure TASARHeader.Read(Stream: TStream);
 var
   PickleLen, IndexLen, JSONLen: UInt32;
-  JSONString: AnsiString;
+  JSONString: AnsiString = '';
 begin
   if Assigned(FData) then
     FData.Free;

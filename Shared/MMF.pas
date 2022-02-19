@@ -11,6 +11,7 @@ uses
   Windows;
 
 type
+  TColor = -$7FFFFFFF-1..$7FFFFFFF;
 
   { TMMFStream }
 
@@ -107,6 +108,7 @@ type
     FLogFileName: string;
     FWhatsMissingExe32, FWhatsMissingLib32: string;
     FWhatsMissingExe64, FWhatsMissingLib64: string;
+    FDefaultColors: TDictionary<Integer, TColor>;
     FChats: TChatList;
 
     // Things copied from settings
@@ -116,6 +118,8 @@ type
     FExcludeUnreadMessagesMutedChats: Boolean;
     FNotificationIconBadgeColor: LongInt;
     FNotificationIconBadgeTextColor: LongInt;
+    fRemoveRoundedElementCorners: Boolean;
+    FUseRegularTitleBar: Boolean;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
     FSuppressPresenceAvailable: Boolean;
@@ -140,6 +144,7 @@ type
     property WhatsMissingLib32: string read FWhatsMissingLib32 write FWhatsMissingLib32;
     property WhatsMissingExe64: string read FWhatsMissingExe64 write FWhatsMissingExe64;
     property WhatsMissingLib64: string read FWhatsMissingLib64 write FWhatsMissingLib64;
+    property DefaultColors: TDictionary<Integer, TColor> read FDefaultColors;
     property Chats: TChatList read FChats;
 
     property ShowNotificationIcon: Boolean read FShowNotificationIcon write FShowNotificationIcon;
@@ -148,6 +153,8 @@ type
     property ExcludeUnreadMessagesMutedChats: Boolean read FExcludeUnreadMessagesMutedChats write FExcludeUnreadMessagesMutedChats;
     property NotificationIconBadgeColor: LongInt read FNotificationIconBadgeColor write FNotificationIconBadgeColor;
     property NotificationIconBadgeTextColor: LongInt read FNotificationIconBadgeTextColor write FNotificationIconBadgeTextColor;
+    property RemoveRoundedElementCorners: Boolean read FRemoveRoundedElementCorners write FRemoveRoundedElementCorners;
+    property UseRegularTitleBar: Boolean read FUseRegularTitleBar write FUseRegularTitleBar;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
     property SuppressPresenceAvailable: Boolean read FSuppressPresenceAvailable write FSuppressPresenceAvailable;
@@ -475,7 +482,7 @@ end;
 procedure TChatList.ReadStream(const MS: TMemoryStream);
 var
   i: Integer;
-  Len: UInt16;
+  Len: SmallInt;
   Chat: TChat;
 begin
   Clear;
@@ -493,7 +500,7 @@ procedure TChatList.WriteStream(const MS: TMemoryStream);
 var
   Chat: TChat;
 begin
-  MS.WriteWord(Count);
+  MS.WriteWord(SmallInt(Count));
 
   for Chat in Self.Values do
     Chat.WriteStream(MS);
@@ -513,11 +520,13 @@ begin
   inherited Create(MMFNAME_LAUNCHER, Owner, 5 * 1024 * 1024);
 
   FChats := TChatList.Create;
+  FDefaultColors := TDictionary<Integer, TColor>.Create;
 end;
 
 destructor TMMFLauncher.Destroy;
 begin
   FChats.Free;
+  FDefaultColors.Free;
 
   inherited Destroy;
 end;
@@ -533,6 +542,10 @@ begin
 end;
 
 procedure TMMFLauncher.ReadStream(const MS: TMemoryStream);
+var
+  i, SettingId: Integer;
+  Count: SmallInt;
+  Color: TColor;
 begin
   FLauncherPid := MS.ReadWord;
   FLauncherWindowHandle := MS.ReadQWord;
@@ -550,6 +563,15 @@ begin
   FWhatsMissingExe64 := MS.ReadAnsiString;
   FWhatsMissingLib64 := MS.ReadAnsiString;
 
+  FDefaultColors.Clear;
+  Count := MS.ReadWord;
+  for i := 0 to Count - 1 do
+  begin
+    SettingId := MS.ReadDWord;
+    Color := MS.ReadDWord;
+    FDefaultColors.Add(SettingId, Color);
+  end;
+
   FChats.ReadStream(MS);
 
   FShowNotificationIcon := Boolean(MS.ReadByte);
@@ -558,6 +580,8 @@ begin
   FExcludeUnreadMessagesMutedChats := Boolean(MS.ReadByte);
   FNotificationIconBadgeColor := MS.ReadDWord;
   FNotificationIconBadgeTextColor := MS.ReadDWord;
+  FRemoveRoundedElementCorners := Boolean(MS.ReadByte);
+  FUseRegularTitleBar := Boolean(MS.ReadByte);
   FHideMaximize := Boolean(MS.ReadByte);
   FAlwaysOnTop := Boolean(MS.ReadByte);
 
@@ -567,6 +591,8 @@ begin
 end;
 
 procedure TMMFLauncher.WriteStream(const MS: TMemoryStream);
+var
+  DefaultColor: TPair<Integer, TColor>;
 begin
   MS.WriteWord(FLauncherPid);
   MS.WriteQWord(FLauncherWindowHandle);
@@ -580,6 +606,13 @@ begin
   MS.WriteAnsiString(FWhatsMissingExe64);
   MS.WriteAnsiString(FWhatsMissingLib64);
 
+  MS.WriteWord(SmallInt(FDefaultColors.Count));
+  for DefaultColor in FDefaultColors do
+  begin
+    MS.WriteDWord(DefaultColor.Key);
+    MS.WriteDWord(DefaultColor.Value);
+  end;
+
   FChats.WriteStream(MS);
 
   MS.WriteByte(Byte(FShowNotificationIcon));
@@ -588,6 +621,8 @@ begin
   MS.WriteByte(Byte(FExcludeUnreadMessagesMutedChats));
   MS.WriteDWord(FNotificationIconBadgeColor);
   MS.WriteDWord(FNotificationIconBadgeTextColor);
+  MS.WriteByte(Byte(FRemoveRoundedElementCorners));
+  MS.WriteByte(Byte(FUseRegularTitleBar));
   MS.WriteByte(Byte(FHideMaximize));
   MS.WriteByte(Byte(FAlwaysOnTop));
   MS.WriteByte(Byte(FSuppressPresenceAvailable));

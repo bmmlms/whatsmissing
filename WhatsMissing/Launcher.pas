@@ -131,6 +131,9 @@ begin
 
   FProcessMonitor := TProcessMonitor.Create;
   FProcessMonitor.OnProcessExited := ProcessMonitorProcessExited;
+  // Process monitoring needs to start before starting WhatsApp, otherwise FProcessMonitor.WaitFor will wait forever in case WhatsApp could not be started
+  // (WaitFor waits indefinite when thread was not started)
+  FProcessMonitor.Start;
 
   FSettingsChangedEvent := TFunctions.CreateEvent(nil, True, False, EVENTNAME_SETTINGS_CHANGED);
   TFunctions.RegisterWaitForSingleObject(@FSettingsChangedWaitHandle, FSettingsChangedEvent, PVOID(@SettingsChanged), Self, INFINITE, $00000008);
@@ -165,7 +168,7 @@ end;
 
 procedure TLauncher.Run;
 var
-  Msg: TMsg;
+  Msg: TMsg = (hwnd: 0; message: 0; wParam: 0; lParam: 0; time: 0; pt: (X: 0; Y: 0));
 begin
   FLog.Info('Launcher started');
 
@@ -219,8 +222,6 @@ begin
     Exit;
   end;
 
-  FProcessMonitor.Start;
-
   FProcessMonitor.AddProcessId(Res.ProcessId);
 
   if not TFunctions.InjectLibrary(FMMFLauncher, Res.ProcessHandle, Res.ThreadHandle) then
@@ -243,7 +244,7 @@ end;
 
 function TLauncher.WndProc(uMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT;
 var
-  Dummy: DWORD;
+  Dummy: DWORD = 0;
   ResourceFilePath: string;
   TaskbarList: ITaskbarList3;
   WhatsAppExes: TStringList;
@@ -282,7 +283,7 @@ begin
       FResources.Add(ThreadResult.ResFileHash, ThreadResult.MMF);
 
       if not Assigned(ThreadResult.MMF) then
-        TFunctions.MessageBox(FHandle, 'Critical error applying patches.', '%s error'.Format([APPNAME]), MB_ICONERROR)
+        TFunctions.MessageBox(FHandle, 'Critical error applying patches, please update %s.'.Format([APPNAME]), '%s error'.Format([APPNAME]), MB_ICONERROR)
       else if ThreadResult.CssError or ThreadResult.JsError then
         if FSettings.LastUsedWhatsAppHash <> ThreadResult.ResFileHash then
           TFunctions.MessageBox(FHandle, 'Some patches could not be applied, please update %s.'.Format([APPNAME]), '%s error'.Format([APPNAME]), MB_ICONERROR);
@@ -360,6 +361,7 @@ var
   RP: TResourcePatcher;
   MMFResources: TMMFResources;
   Res: TResourceThreadResult;
+  DefaultColor: TPair<Integer, TColor>;
 begin
   ResourceFilePath := TFunctions.GetResourceFilePath(PID);
 
@@ -378,6 +380,9 @@ begin
 
       FMMFLauncher.Read;
       FMMFLauncher.ResourceSettingsChecksum := FSettings.ResourceSettingsChecksum;
+      FMMFLauncher.DefaultColors.Clear;
+      for DefaultColor in RP.DefaultColors do
+        FMMFLauncher.DefaultColors.Add(DefaultColor);
       FMMFLauncher.Write;
 
       Res.CssError := RP.CssError;

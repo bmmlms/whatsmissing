@@ -98,8 +98,6 @@ var
   WaitRes: Cardinal;
   WaitHandles: TWOHandleArray;
 begin
-  inherited;
-
   while not Terminated do
   begin
     WaitHandles[0] := FReloadEvent;
