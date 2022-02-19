@@ -29,9 +29,8 @@
     </General>
     <VersionInfo>
       <UseVersionInfo Value="True"/>
-      <MinorVersionNr Value="3"/>
-      <RevisionNr Value="4"/>
-      <StringTable FileDescription="WhatsMissing Setup" ProductName="WhatsMissing Setup" ProductVersion="0.3.4.0"/>
+      <MinorVersionNr Value="4"/>
+      <StringTable FileDescription="WhatsMissing Setup" ProductName="WhatsMissing Setup" ProductVersion="0.4.0.0"/>
     </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="Debug" Default="True"/>

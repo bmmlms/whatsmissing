@@ -116,7 +116,7 @@ var
   Res: TStartProcessRes;
   WhatsMissingExecutable: string;
   WhatsAppExes: TStringList;
-  Files: TFileDataArray;
+  Files: TFileDataArray = [];
   ArchiveStream: TMemoryStream;
 begin
   if not DirectoryExists(TPaths.WhatsMissingDir) then
