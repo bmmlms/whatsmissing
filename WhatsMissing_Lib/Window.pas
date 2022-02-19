@@ -306,8 +306,7 @@ begin
     WM_NCCALCSIZE, WM_NCACTIVATE:
       if FMMFLauncher.UseRegularTitleBar then
         Exit(DefWindowProcW(FHandle, uMsg, wParam, lParam))
-    else
-      if uMsg = FTaskbarCreatedMsg then
+      else if uMsg = FTaskbarCreatedMsg then
       begin
         if FMMFLauncher.ShowNotificationIcon then
           ShowOrUpdateNotificationIcon;
@@ -321,7 +320,7 @@ end;
 function TWindow.MouseHook(Code: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT;
 var
   P: TPoint = (X: 0; Y: 0);
-  Rect: TRect;
+  Rect: TRect = (Left: 0; Top: 0; Right: 0; Bottom: 0);
 var
   MHS: PMOUSEHOOKSTRUCT;
 begin
@@ -532,7 +531,7 @@ procedure TWindow.HideMainWindow;
 begin
   // If closed by clicking "X" in the titlebar the "X" button will look hovered after restoring the window, this fixes it.
   if not FMMFLauncher.UseRegularTitleBar then
-  SendMessage(FHandle, WM_MOUSEMOVE, 0, MAKELPARAM(10, 40));
+    SendMessage(FHandle, WM_MOUSEMOVE, 0, MAKELPARAM(10, 40));
 
   Fade(False);
   ShowWindow(FHandle, SW_HIDE);
@@ -677,14 +676,11 @@ type
   end;
 
 var
-  CirclePos: Integer;
-  DC, Bmp, Pen, PenOld, Brush, BrushOld, Icon: Handle;
-  TransparentColor, PenColor, BrushColor: COLORREF;
-  BitmapStart, BitmapEnd: Pointer;
-  IconInfo: TIconInfo;
+  DC, Bmp, Icon: Handle;
+  BitmapStart: Pointer = nil;
+  IconInfo: TIconInfo = (fIcon: False; xHotspot: 0; yHotspot: 0; hbmMask: 0; hbmColor: 0);
   BitmapHeader: BITMAPV5HEADER;
   BitmapInfo: BITMAP;
-  Chat: TChat;
   NOI: TNotificationOverlayInfo;
   NotificationBitmap: TByteArray;
 begin
@@ -815,7 +811,8 @@ type
     BitmapHeader: BITMAPV5HEADER;
     FHeight, X, Y: LongInt;
     BitmapSize: TSize;
-    BitmapStart, RGBQuad: PRGBQUAD;
+    BitmapStart: PRGBQUAD = nil;
+    RGBQuad: PRGBQUAD;
     TopLeft, BottomRight: TPoint;
   begin
     Result := False;
@@ -885,9 +882,11 @@ type
     FontOld: HFONT;
     R: TRect;
     DC, Bmp, Pen, PenOld, Brush, BrushOld: Handle;
-    BitmapStart: PRGBQUAD;
+    BitmapStart: PRGBQUAD = nil;
     BitmapHeader: BITMAPV5HEADER;
   begin
+    Result := [];
+
     DC := CreateCompatibleDC(0);
 
     BitmapHeader := GetBitmapHeader(Size);
@@ -938,14 +937,14 @@ const
 var
   DC, Bmp, Icon: Handle;
   Text: string;
-  BitmapStart: PRGBQUAD;
+  BitmapStart: PRGBQUAD = nil;
   BitmapHeader: BITMAPV5HEADER;
-  IconInfo: TICONINFO;
+  IconInfo: TICONINFO = (fIcon: False; xHotspot: 0; yHotspot: 0; hbmMask: 0; hbmColor: 0);
   BitmapInfo: BITMAP;
   BadgeBitmap: TByteArray;
   BitmapSize, BoxSize: TSize;
   BoxPos: TPoint;
-  TextDrawInfo: TTextDrawInfo;
+  TextDrawInfo: TTextDrawInfo = (Font: 0; LeftPadding: 0; TopPadding: 0; Width: 0; Height: 0);
 begin
   if ExtractIconExW(PWideChar(UnicodeString(ParamStr(0))), 0, nil, @Icon, 1) <> 1 then
     raise Exception.Create('ExtractIconExW() failed');

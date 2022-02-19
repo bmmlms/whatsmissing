@@ -4,7 +4,6 @@ interface
 
 uses
   Classes,
-  Generics.Collections,
   Windows,
   SysUtils;
 
@@ -41,7 +40,9 @@ end;
 
 procedure ColorToHLS(const AColor: TColor; out H, L, S: Byte);
 var
-  R, G, B: Byte;
+  R: Byte = 0;
+  G: Byte = 0;
+  B: Byte = 0;
   RGB: TColorRef;
 begin
   RGB := ColorToRGB(AColor);
@@ -145,11 +146,10 @@ begin
   Result := HLStoColor(Hue, Luminance, Saturation);
 end;
 
-function ColorAdjustLuma(clrRGB: TColor; n: Integer; fScale: BOOL): TColor;
+function ColorAdjustLuma(clrRGB: TColor; n: Integer): TColor;
 var
   H, L, S: Byte;
 begin
-  // what is fScale?
   ColorToHLS(clrRGB, H, L, S);
   Result := HLStoColor(H, L + n, S);
 end;
