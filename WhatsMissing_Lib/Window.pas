@@ -170,8 +170,6 @@ begin
   ModifySystemMenu;
   CreateNotificationMenu;
 
-  //  ZeroMemory(@FNotifyData, SizeOf(FNotifyData));
-
   FTaskbarCreatedMsg := RegisterWindowMessage('TaskbarCreated');
 end;
 
@@ -202,7 +200,8 @@ begin
               Exit(0);
           SC_MINIMIZE:
             // If minimized by clicking "_" in the titlebar the "_" button will look hovered after restoring the window, this fixes it.
-            SendMessage(FHandle, WM_MOUSEMOVE, 0, MAKELPARAM(10, 40));
+            if not FMMFLauncher.UseRegularTitleBar then
+              SendMessage(FHandle, WM_MOUSEMOVE, 0, MAKELPARAM(10, 40));
         end;
     WM_INITMENUPOPUP:
       MenuPopup(wParam);
@@ -304,6 +303,9 @@ begin
       end;
       Exit(0);
     end;
+    WM_NCCALCSIZE, WM_NCACTIVATE:
+      if FMMFLauncher.UseRegularTitleBar then
+        Exit(DefWindowProcW(FHandle, uMsg, wParam, lParam))
     else
       if uMsg = FTaskbarCreatedMsg then
       begin
@@ -318,6 +320,7 @@ end;
 
 function TWindow.MouseHook(Code: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT;
 var
+  P: TPoint = (X: 0; Y: 0);
   Rect: TRect;
 var
   MHS: PMOUSEHOOKSTRUCT;
@@ -327,25 +330,40 @@ begin
 
   MHS := PMOUSEHOOKSTRUCT(lParam);
 
-  GetWindowRect(MHS^.hwnd, Rect);
-  Rect.Left := Rect.Right - 46;
-  Rect.Bottom := Rect.Top + 35;
-
-  if PtInRect(Rect, MHS^.pt) then
+  if FMMFLauncher.UseRegularTitleBar then
   begin
-    if wParam = WM_LBUTTONDOWN then
-      FWasInCloseButton := True;
+    // With the usual custom drawn title bar it's possible to resize the window at the top which makes no sense with the regular title bar
+    GetClientRect(MHS^.hwnd, Rect);
 
-    if wParam = WM_LBUTTONUP then
-      try
-        if FWasInCloseButton then
-        begin
-          SendMessage(FHandle, WM_CLOSE, 0, 0);
-          Exit(1);
+    ClientToScreen(MHS^.hwnd, P);
+    Rect.Top := P.Y;
+    Rect.Left := P.X;
+    Rect.Height := 5;
+
+    if PtInRect(Rect, MHS^.pt) then
+      Exit(1);
+  end else
+  begin
+    GetWindowRect(MHS^.hwnd, Rect);
+    Rect.Left := Rect.Right - 46;
+    Rect.Bottom := Rect.Top + 35;
+
+    if PtInRect(Rect, MHS^.pt) then
+    begin
+      if wParam = WM_LBUTTONDOWN then
+        FWasInCloseButton := True;
+
+      if wParam = WM_LBUTTONUP then
+        try
+          if FWasInCloseButton then
+          begin
+            SendMessage(FHandle, WM_CLOSE, 0, 0);
+            Exit(1);
+          end;
+        finally
+          FWasInCloseButton := False;
         end;
-      finally
-        FWasInCloseButton := False;
-      end;
+    end;
   end;
 
   Result := CallNextHookEx(0, Code, wParam, lParam);
@@ -513,6 +531,7 @@ end;
 procedure TWindow.HideMainWindow;
 begin
   // If closed by clicking "X" in the titlebar the "X" button will look hovered after restoring the window, this fixes it.
+  if not FMMFLauncher.UseRegularTitleBar then
   SendMessage(FHandle, WM_MOUSEMOVE, 0, MAKELPARAM(10, 40));
 
   Fade(False);

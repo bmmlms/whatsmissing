@@ -6,15 +6,15 @@ uses
   Classes,
   Constants,
   DDetours,
-  Functions,
   fpjson,
-  Log,
-  jsonparser,
-  MMF,
-  VirtualFile,
-  Paths,
+  Functions,
   Generics.Collections,
+  jsonparser,
+  Log,
+  MMF,
+  Paths,
   SysUtils,
+  VirtualFile,
   Windows;
 
 type
@@ -33,6 +33,7 @@ type
   TGetFileSizeEx = function(hFile: HANDLE; lpFileSize: PLARGE_INTEGER): BOOL; stdcall;
   TRegSetValueExW = function(hKey: HKEY; lpValueName: LPCWSTR; Reserved: DWORD; dwType: DWORD; lpData: Pointer; cbData: DWORD): LONG; stdcall;
   TRegQueryValueExW = function(hKey: HKEY; lpValueName: LPCWSTR; lpReserved: LPDWORD; lpType: LPDWORD; lpData: LPBYTE; lpcbData: LPDWORD): LONG; stdcall;
+  TSetWindowLong = function(hWnd: HWND; nIndex: longint; dwNewLong: LONG): LONG; stdcall;
 
   TVirtualFileData = record
     Handle: THandle;
@@ -43,7 +44,7 @@ type
 
   THooks = class
   private
-    class var
+  class var
     FMMFLauncher: TMMFLauncher;
     FLog: TLog;
     FResourceError: Boolean;
@@ -67,6 +68,7 @@ type
     OGetFileSizeEx: TGetFileSizeEx;
     ORegSetValueExW: TRegSetValueExW;
     ORegQueryValueExW: TRegQueryValueExW;
+    OSetWindowLongW: TSetWindowLong;
 
     class function HCreateProcessInternalW(hToken: HANDLE; lpApplicationName: LPCWSTR; lpCommandLine: LPWSTR; lpProcessAttributes, lpThreadAttributes: LPSECURITY_ATTRIBUTES;
       bInheritHandles: BOOL; dwCreationFlags: DWORD; lpEnvironment: LPVOID; lpCurrentDirectory: LPCWSTR; lpStartupInfo: LPSTARTUPINFOW; lpProcessInformation: LPPROCESS_INFORMATION; hNewToken: PHANDLE): BOOL; stdcall; static;
@@ -81,9 +83,11 @@ type
     class function HGetFileSizeEx(hFile: HANDLE; lpFileSize: PLARGE_INTEGER): BOOL; stdcall; static;
     class function HRegSetValueExW(hKey: HKEY; lpValueName: LPCWSTR; Reserved: DWORD; dwType: DWORD; lpData: Pointer; cbData: DWORD): LONG; stdcall; static;
     class function HRegQueryValueExW(hKey: HKEY; lpValueName: LPCWSTR; lpReserved: LPDWORD; lpType: LPDWORD; lpData: LPBYTE; lpcbData: LPDWORD): LONG; stdcall; static;
+    class function HSetWindowLongW(hWnd: HWND; nIndex: longint; dwNewLong: LONG): LONG; stdcall; static;
   public
-    class var
-    OnMainWindowCreated: procedure(Handle: THandle);
+  class var
+    OnMainWindowCreated:
+    procedure(Handle: THandle);
 
     class procedure Initialize(const Log: TLog); static;
   end;
@@ -126,6 +130,8 @@ begin
 
   @ORegSetValueExW := InterceptCreate(@RegSetValueExW, @HRegSetValueExW);
   @ORegQueryValueExW := InterceptCreate(@RegQueryValueExW, @HRegQueryValueExW);
+
+  @OSetWindowLongW := InterceptCreate(@SetWindowLongW, @HSetWindowLongW);
 end;
 
 class function THooks.HCreateProcessInternalW(hToken: HANDLE; lpApplicationName: LPCWSTR; lpCommandLine: LPWSTR; lpProcessAttributes, lpThreadAttributes: LPSECURITY_ATTRIBUTES;
@@ -133,7 +139,8 @@ class function THooks.HCreateProcessInternalW(hToken: HANDLE; lpApplicationName:
 var
   LastError: Cardinal;
 begin
-  if string(lpApplicationName).Trim.ToLower.Equals(FMMFLauncher.WhatsMissingExe32.ToLower) or string(lpApplicationName).Trim.ToLower.Equals(FMMFLauncher.WhatsMissingExe64.ToLower) or string(lpCommandLine).ToLower.Contains('--squirrel-obsolete') then
+  if string(lpApplicationName).Trim.ToLower.Equals(FMMFLauncher.WhatsMissingExe32.ToLower) or string(lpApplicationName).Trim.ToLower.Equals(FMMFLauncher.WhatsMissingExe64.ToLower) or
+    string(lpCommandLine).ToLower.Contains('--squirrel-obsolete') then
     Exit(OCreateProcessInternalW(hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation, hNewToken));
 
   Result := OCreateProcessInternalW(hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags or CREATE_SUSPENDED, lpEnvironment,
@@ -362,13 +369,13 @@ end;
 
 class function THooks.HWriteFile(hFile: HANDLE; lpBuffer: LPVOID; nNumberOfBytesToWrite: DWORD; lpNumberOfBytesWritten: PDWORD; lpOverlapped: POverlapped): BOOL; stdcall;
 
-  type
-    TWhatsAppData = record
-      MessageType: string;
-      MessageSubType: string;
-      DataType: string;
-      DataSubType: string;
-    end;
+type
+  TWhatsAppData = record
+    MessageType: string;
+    MessageSubType: string;
+    DataType: string;
+    DataSubType: string;
+  end;
 
   function ParseWhatsAppData(Data: TJSONData): TWhatsAppData;
   var
@@ -507,9 +514,8 @@ begin
         end else if JSONObject.Strings['method'] = 'socket_out' then
         begin
           if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'relay') and (WhatsAppData.DataType = 'message') then
-          begin
-            FLog.Debug('Sent chat message');
-          end else if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'set') and (WhatsAppData.DataType = 'read') and Assigned(JSONData.FindPath('[2][0][1].count')) then
+            FLog.Debug('Sent chat message')
+          else if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'set') and (WhatsAppData.DataType = 'read') and Assigned(JSONData.FindPath('[2][0][1].count')) then
           begin
             // A chats read state changed
             // {"method":"socket_out","data":["action",{"type":"set","epoch":"5"},[["read",{"jid":"0000000000000@c.us","index":"C5F4B6909150C9968BA4997601BE0C8A","owner":"false","count":"5"},null]]]}
@@ -518,12 +524,10 @@ begin
 
             SetUnreadMessages(FMMFLauncher.Chats.Get(JSONData.FindPath('[2][0][1].jid').Value), JSONData.FindPath('[2][0][1].count').Value = -2, 0);
           end else if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'set') and (WhatsAppData.DataType = 'presence') then
-          begin
             if FMMFLauncher.SuppressPresenceAvailable and (WhatsAppData.DataSubType = 'available') then
               FWAMethodResult := TJSONBoolean.Create(False)
             else if FMMFLauncher.SuppressPresenceComposing and (WhatsAppData.DataSubType = 'composing') then
               FWAMethodResult := TJSONBoolean.Create(False);
-          end;
 
           if not Assigned(FWAMethodResult) then
             FWAMethodResult := TJSONBoolean.Create(True)
@@ -535,9 +539,8 @@ begin
           // {"method":"message","data":{"sent":false,"jid":"0000000000000@c.us"}}
 
           if JSONData.FindPath('sent').AsBoolean then
-          begin
-            FLog.Debug('Sent chat message');
-          end else if not FMMFLauncher.Chats.Get(JSONData.FindPath('jid').Value).Muted then
+            FLog.Debug('Sent chat message')
+          else if not FMMFLauncher.Chats.Get(JSONData.FindPath('jid').Value).Muted then
           begin
             FLog.Debug('Received chat message');
 
@@ -671,6 +674,30 @@ begin
   end;
 
   Result := ORegQueryValueExW(hKey, lpValueName, lpReserved, lpType, lpData, lpcbData);
+end;
+
+class function THooks.HSetWindowLongW(hWnd: HWND; nIndex: longint; dwNewLong: LONG): LONG; stdcall;
+var
+  LastError: Cardinal;
+begin
+  if not FMMFLauncher.UseRegularTitleBar then
+    Exit(OSetWindowLongW(hWnd, nIndex, dwNewLong));
+
+  if (hWnd = FMainWindowHandle) and (nIndex = GWL_STYLE) then
+  begin
+    dwNewLong := WS_OVERLAPPEDWINDOW;
+    if FMMFLauncher.HideMaximize then
+      dwNewLong := dwNewLong and not WS_MAXIMIZEBOX;
+  end;
+
+  Result := OSetWindowLongW(hWnd, nIndex, dwNewLong);
+
+  LastError := GetLastError;
+
+  if (hWnd = FMainWindowHandle) and (Result <> 0) then
+    SetWindowPos(FMainWindowHandle, 0, 0, 0, 0, 0, SWP_NOACTIVATE or SWP_NOZORDER or SWP_NOMOVE or SWP_NOSIZE or SWP_FRAMECHANGED);
+
+  SetLastError(LastError);
 end;
 
 end.

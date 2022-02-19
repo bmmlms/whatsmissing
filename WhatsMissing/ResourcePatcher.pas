@@ -5,6 +5,7 @@ interface
 uses
   ASAR,
   Classes,
+  CSSUtil,
   fpjson,
   Functions,
   Generics.Collections,
@@ -14,56 +15,33 @@ uses
   Paths,
   RegExpr,
   Settings,
-  SysUtils,
-  Windows;
+  StrUtils,
+  SysUtils;
 
 type
-  TThreadResourcePatchInfo = record
-    Setting: TResourceColorSetting;
-    Patch: TResourceColorSettingPatch;
-    Matches: LongInt;
+
+  { TMemoryStreamHelper }
+
+  TMemoryStreamHelper = class helper for TMemoryStream
+    procedure AssignFrom(const Source: TMemoryStream); overload;
+    procedure AssignFrom(const Source: AnsiString); overload;
+    function AsString: AnsiString;
   end;
-  PThreadResourcePatchInfo = ^TThreadResourcePatchInfo;
 
   { TResourcePatcher }
 
   TResourcePatcher = class
   private
-  type
-    TThreadPatchInfo = record
-      Search: string;
-      Replace: string;
-      ReplaceFlags: TReplaceFlags;
-      IsRegEx: Boolean;
-      Target: TTarget;
-      Matches: LongInt;
-    end;
-    PThreadPatchInfo = ^TThreadPatchInfo;
-
-    TThreadParameter = record
-      ResourcePatchInfos: TList;
-      PatchInfos: TList<PThreadPatchInfo>;
-      Settings: TSettings;
-      AsarFile: TASARFile;
-      ASARCriticalSection: PCriticalSection;
-      Result: AnsiString;
-      Modified: Boolean;
-      Exception: string;
-    end;
-    PThreadParameter = ^TThreadParameter;
-
-  var
     FSettings: TSettings;
     FLog: TLog;
 
     FJSON: TMemoryStream;
     FResources: TMemoryStream;
     FContentOffset: Cardinal;
+    FDefaultColors: TDictionary<Integer, TColor>;
 
     FCssError: Boolean;
     FJsError: Boolean;
-
-    class procedure PatchThread(const Parameters: PThreadParameter); stdcall; static;
   public
     constructor Create(const Settings: TSettings; const Log: TLog);
     destructor Destroy; override;
@@ -73,6 +51,7 @@ type
     property JSON: TMemoryStream read FJSON;
     property Resources: TMemoryStream read FResources;
     property ContentOffset: Cardinal read FContentOffset;
+    property DefaultColors: TDictionary<Integer, TColor> read FDefaultColors;
 
     property CssError: Boolean read FCssError;
     property JsError: Boolean read FJsError;
@@ -80,79 +59,26 @@ type
 
 implementation
 
-{ TResourcePatcher }
+{ TMemoryStreamHelper }
 
-class procedure TResourcePatcher.PatchThread(const Parameters: PThreadParameter); stdcall;
-var
-  StrLen: Int64;
-  ReplaceCount: LongInt;
-  ThreadPatchInfo: PThreadPatchInfo;
-  ThreadResourcePatchInfo: PThreadResourcePatchInfo;
-  RegEx: TRegExpr;
+procedure TMemoryStreamHelper.AssignFrom(const Source: TMemoryStream);
 begin
-  try
-    EnterCriticalSection(Parameters.ASARCriticalSection);
-    try
-      SetString(Parameters.Result, PAnsiChar(Parameters.AsarFile.Contents.Memory), Parameters.AsarFile.Contents.Size);
-    finally
-      LeaveCriticalSection(Parameters.ASARCriticalSection);
-    end;
-
-    for ThreadPatchInfo in Parameters.PatchInfos do
-    begin
-      if ((ThreadPatchInfo.Target = tJs) and (not Parameters.AsarFile.Name.EndsWith('.js', True))) or ((ThreadPatchInfo.Target = tCss) and (not Parameters.AsarFile.Name.EndsWith('.css', True))) then
-        Continue;
-
-      if ThreadPatchInfo.IsRegEx then
-      begin
-        RegEx := TRegExpr.Create;
-        RegEx.ModifierI := True;
-        RegEx.ModifierM := True;
-        try
-          StrLen := Parameters.Result.Length;
-          RegEx.Expression := ThreadPatchInfo.Search;
-          Parameters.Result := RegEx.Replace(Parameters.Result, ThreadPatchInfo.Replace, True);
-          if StrLen <> Parameters.Result.Length then
-          begin
-            Parameters.Modified := True;
-            InterLockedIncrement(ThreadPatchInfo.Matches);
-          end;
-        finally
-          RegEx.Free;
-        end;
-      end else
-      begin
-        Parameters.Result := StringReplace(Parameters.Result, ThreadPatchInfo.Search, ThreadPatchInfo.Replace, ThreadPatchInfo.ReplaceFlags, ReplaceCount);
-        if ReplaceCount > 0 then
-        begin
-          Parameters.Modified := True;
-          InterLockedExchangeAdd(ThreadPatchInfo.Matches, ReplaceCount);
-        end;
-      end;
-    end;
-
-    for ThreadResourcePatchInfo in Parameters.ResourcePatchInfos do
-    begin
-      if Parameters.AsarFile.Name.EndsWith('.css', True) and (ThreadResourcePatchInfo.Patch.Target = tCss) then
-        Parameters.Result := ThreadResourcePatchInfo.Patch.Execute(Parameters.Result, ThreadResourcePatchInfo.Setting.GetColor(ThreadResourcePatchInfo.Patch.ColorAdjustment), ReplaceCount)
-      else if Parameters.AsarFile.Name.EndsWith('.js', True) and (ThreadResourcePatchInfo.Patch.Target = tJs) then
-        Parameters.Result := ThreadResourcePatchInfo.Patch.Execute(Parameters.Result, ThreadResourcePatchInfo.Setting.GetColor(ThreadResourcePatchInfo.Patch.ColorAdjustment), ReplaceCount)
-      else
-        ReplaceCount := 0;
-
-      if ReplaceCount > 0 then
-      begin
-        Parameters.Modified := True;
-        InterLockedExchangeAdd(ThreadResourcePatchInfo.Matches, ReplaceCount);
-      end;
-    end;
-  except
-    on E: Exception do
-    begin
-      Parameters.Exception := E.Message;
-    end;
-  end;
+  Clear;
+  CopyFrom(Source, 0);
 end;
+
+procedure TMemoryStreamHelper.AssignFrom(const Source: AnsiString);
+begin
+  Clear;
+  Write(Source[1], Source.Length);
+end;
+
+function TMemoryStreamHelper.AsString: AnsiString;
+begin
+  SetString(Result, PAnsiChar(Memory), Size);
+end;
+
+{ TResourcePatcher }
 
 constructor TResourcePatcher.Create(const Settings: TSettings; const Log: TLog);
 begin
@@ -161,237 +87,423 @@ begin
 
   FResources := TMemoryStream.Create;
   FJSON := TMemoryStream.Create;
+  FDefaultColors := TDictionary<Integer, TColor>.Create;
 end;
 
 destructor TResourcePatcher.Destroy;
 begin
   FResources.Free;
   FJSON.Free;
+  FDefaultColors.Free;
 
   inherited;
 end;
 
-function SortResourcePatchInfos(A, B: PThreadResourcePatchInfo): LongInt; register;
-begin
-  if A.Patch.SearchText.Length > B.Patch.SearchText.Length then
-    Result := -1
-  else if A.Patch.SearchText.Length < B.Patch.SearchText.Length then
-    Result := 1
-  else
-    Result := 0;
-end;
-
 procedure TResourcePatcher.ConsumeFile(const FileName: string);
 type
-  TStringReplace = record
+  TRegExReplace = record
+    FilePattern: array of string;
     Search: string;
     Replace: string;
-    ReplaceFlags: TReplaceFlags;
   end;
 
-  TRegExReplace = record
-    Search: string;
-    Replace: string;
+  TFileInfo = record
+    AsarFile: TASARFile;
+    CssDocument: TCSSDocument;
+    Js: AnsiString;
+    Modified: Boolean;
+  end;
+  PFileInfo = ^TFileInfo;
+
+  function NewFileInfo(const AsarFile: TASARFile; const CssDocument: TCSSDocument; const Js: AnsiString): PFileInfo;
+  begin
+    New(Result);
+    Result.AsarFile := AsarFile;
+    Result.CssDocument := CssDocument;
+    Result.Js := Js;
+    Result.Modified := False;
+  end;
+
+  function IsAnyWild(Input: string; Wilds: array of string): Boolean;
+  var
+    S: string;
+  begin
+    Result := False;
+
+    for S in Wilds do
+      if IsWild(Input, S, True) then
+        Exit(True);
   end;
 
 const
-  FPreloadJsPatch: AnsiString = '(function() { var fs = require("fs"); var h = fs.openSync("\\\\.\\wacommunication", "w+"); window.wmcall = function(method, data) ' +
+  PreloadJsPatch: AnsiString = '(function() { var fs = require("fs"); var h = fs.openSync("\\\\.\\wacommunication", "w+"); window.wmcall = function(method, data) ' +
     '{ var b = Buffer.alloc(1024); fs.writeSync(h, JSON.stringify({ method: method, data: data })); fs.readSync(h, b, 0, 1024, 0); return JSON.parse(b.toString()); }; }());';
-  FCssStringReplacements: array[0..5] of TStringReplace = (
-    (Search: '#windows-title-minimize.blurred{opacity:.7}'; Replace: '#windows-title-minimize.blurred{opacity:1}'; ReplaceFlags: []),
-    (Search: '#windows-title-maximize.blurred{opacity:.7}'; Replace: '#windows-title-maximize.blurred{opacity:1}'; ReplaceFlags: []),
-    (Search: '#windows-title-close.blurred{opacity:.7}'; Replace: '#windows-title-close.blurred{opacity:1}'; ReplaceFlags: []),
-    (Search: '#windows-title-minimize{position:absolute;'; Replace: '#windows-title-minimize{position:absolute;cursor:default;'; ReplaceFlags: []),
-    (Search: '#windows-title-maximize{position:absolute;'; Replace: '#windows-title-maximize{position:absolute;cursor:default;'; ReplaceFlags: []),
-    (Search: '#windows-title-close{position:absolute;'; Replace: '#windows-title-close{position:absolute;cursor:default;'; ReplaceFlags: []));
-  FJsRegExReplacements: array[0..4] of TRegExReplace = (
-    (Search: 'return (.)\.apply\(this,arguments\)}}\(\),this\.write='; Replace: 'return $1.apply(this,arguments).then(function (vv) { window.wmcall("socket_in", vv); return vv; }); }}(),this.write='),
-    (Search: 'return (.)\.writeNode\((.),(.)\),(.)\.encrypt\((.)\.toBuffer\(\)\)\}\)\)'; Replace: 'if (!window.wmcall("socket_out", $3)) return; return $1.writeNode($2,$3),$4.encrypt($5.toBuffer())}))'),
-    (Search: 'var (.)=this\.parseMsg\((.)\[0\],"relay"\);'; Replace: 'var $1=this.parseMsg($2[0],"relay"); window.wmcall("message", {sent: $1.id.fromMe, jid: $1.id.remote});'),
-    (Search: '(.)\.MuteCollection\.getGlobalSounds\(\)&&\((.)\.id'; Replace: 'window.wmcall("ask_notification_sound", $2.id) &&$1.MuteCollection.getGlobalSounds()&&($2.id'),
-    (Search: 'SEND_UNAVAILABLE_WAIT:15e3,'; Replace: 'SEND_UNAVAILABLE_WAIT:3e3,'));
+
+  SetOpacityOne: array[0..2] of string = ('#windows-title-minimize.blurred', '#windows-title-maximize.blurred', '#windows-title-close.blurred');
+
+  AddCursorDefault: array[0..2] of string = ('#windows-title-minimize', '#windows-title-maximize', '#windows-title-close');
+
+  JsRegExReplacements: array[0..4] of TRegExReplace = (
+    (FilePattern: ['bootstrap_main.*.js']; Search: 'return (.)\.apply\(this,arguments\)}}\(\),this\.write='; Replace: 'return $1.apply(this,arguments).then(function (vv) { window.wmcall("socket_in", vv); return vv; }); }}(),this.write='),
+    (FilePattern: ['bootstrap_main.*.js']; Search: 'return (.)\.writeNode\((.),(.)\),(.)\.encrypt\((.)\.toBuffer\(\)\)\}\)\)';
+    Replace: 'if (!window.wmcall("socket_out", $3)) return; return $1.writeNode($2,$3),$4.encrypt($5.toBuffer())}))'),
+    (FilePattern: ['bootstrap_main.*.js']; Search: 'var (.)=this\.parseMsg\((.)\[0\],"relay"\);'; Replace: 'var $1=this.parseMsg($2[0],"relay"); window.wmcall("message", {sent: $1.id.fromMe, jid: $1.id.remote});'),
+    (FilePattern: ['bootstrap_main.*.js']; Search: '(.)\.MuteCollection\.getGlobalSounds\(\)&&\((.)\.id'; Replace: 'window.wmcall("ask_notification_sound", $2.id) &&$1.MuteCollection.getGlobalSounds()&&($2.id'),
+    (FilePattern: ['index.worker.js', 'main.js', 'renderer.js', 'voip.js']; Search: 'SEND_UNAVAILABLE_WAIT:15e3,'; Replace: 'SEND_UNAVAILABLE_WAIT:3e3,'));
 
 var
   Asar: TASAR;
   AsarEntry: TASAREntry;
-  AsarPreloadJs: TASARFile;
+  AsarFile: TASARFile;
   FileOffset: Integer;
-  PreloadJs: AnsiString;
-  ColorSetting: TColorSetting;
-  ResourcePatch: TResourceColorSettingPatch;
-  StringReplace: TStringReplace;
+  ColorSetting: TColorSettingBase;
+  ColorSettingResource: TColorSettingResource absolute ColorSetting;
+  ResourcePatch: TColorSettingResourcePatch;
   RegExReplace: TRegExReplace;
-  FileUpdate: TPair<TJSONObject, string>;
-  FileUpdates: TDictionary<TJSONObject, string>;
-  ThreadPatchInfo: PThreadPatchInfo;
-  ThreadPatchInfos: TList<PThreadPatchInfo>;
-  ThreadResourcePatchInfo: PThreadResourcePatchInfo;
-  ThreadResourcePatchInfos: TList;
-  Dummy: DWORD;
-  ThreadHandles: array of THandle;
-  ThreadParameter: PThreadParameter;
-  ThreadParameters: TList<PThreadParameter>;
-  ASARCriticalSection: TCriticalSection;
-
-  procedure AddThreadPatchInfo(const Search, Replace: string; const ReplaceFlags: TReplaceFlags; const IsRegEx: Boolean; const Target: TTarget);
-  begin
-    New(ThreadPatchInfo);
-    ZeroMemory(ThreadPatchInfo, SizeOf(TThreadPatchInfo));
-    ThreadPatchInfo.Search := Search;
-    ThreadPatchInfo.Replace := Replace;
-    ThreadPatchInfo.ReplaceFlags := ReplaceFlags;
-    ThreadPatchInfo.IsRegEx := IsRegEx;
-    ThreadPatchInfo.Target := Target;
-    ThreadPatchInfos.Add(ThreadPatchInfo);
-  end;
-
+  CssRule: TCSSRule;
+  CssValue: TCSSValue;
+  CssDeclaration: TCSSDeclaration;
+  FileInfo: PFileInfo;
+  StrLen: Integer;
+  FileInfos: TList<PFileInfo>;
+  ReplaceCount, PatchReplaceCount: Integer;
+  OriginalColorHtml, NewColor, Selector: string;
+  OriginalColor: TColor;
+  Stream: TMemoryStream;
+  RegEx: TRegExpr;
+  Found: Boolean;
+  Wild: string;
+  Wilds: TList<string>;
+  OriginalClassesToColors: TDictionary<string, string>;
+  OriginalColorToColors: TDictionary<string, string>;
 begin
   FLog.Info('Processing file "%s"'.Format([FileName]));
 
+  Wilds := TList<string>.Create;
+  Wilds.Add('*.css');
+
+  for RegExReplace in JsRegExReplacements do
+    for Wild in RegExReplace.FilePattern do
+      if not Wilds.Contains(Wild) then
+        Wilds.Add(Wild);
+
+  for ColorSetting in FSettings.ColorSettings do
+    if (ColorSetting.ClassType = TColorSettingResource) then
+      for ResourcePatch in ColorSettingResource.Patches do
+        if (ResourcePatch.Options.UpdateInFile <> '') and not Wilds.Contains(ResourcePatch.Options.UpdateInFile) then
+          Wilds.Add(ResourcePatch.Options.UpdateInFile);
+
+
+  FCssError := False;
+  FJsError := False;
+
+  FDefaultColors.Clear;
   FJSON.Clear;
   FResources.Clear;
 
   Asar := TASAR.Create;
-  FileUpdates := TDictionary<TJSONObject, string>.Create;
+  FileInfos := TList<PFileInfo>.Create;
+  OriginalClassesToColors := TDictionary<string, string>.Create;
+  OriginalColorToColors := TDictionary<string, string>.Create;
+
   try
     Asar.Read(Filename);
 
-    FCssError := False;
-    FJsError := False;
-
-    AsarPreloadJs := TASARFile(Asar.Root.FindEntry('preload.js', TASARFile));
-    if Assigned(AsarPreloadJs) then
-      SetString(PreloadJs, PAnsiChar(AsarPreloadJs.Contents.Memory), AsarPreloadJs.Contents.Size)
-    else
+    // Patch preload.js
+    AsarFile := TASARFile(Asar.Root.FindEntry('preload.js', TASARFile));
+    if Assigned(AsarFile) then
+    begin
+      FileInfo := NewFileInfo(AsarFile, nil, PreloadJsPatch + AsarFile.Contents.AsString);
+      FileInfo.Modified := True;
+      FileInfos.Add(FileInfo);
+    end else
     begin
       FLog.Error('"preload.js" could not be found');
       FJsError := True;
     end;
 
-    ThreadParameters := TList<PThreadParameter>.Create;
-    ThreadPatchInfos := TList<PThreadPatchInfo>.Create;
-    ThreadResourcePatchInfos := TList.Create;
-    try
-      // Sort patches by length so that simple replacements don't render complex replacements invalid if they include the same color
-      for ColorSetting in FSettings.ColorSettings do
-        if ColorSetting.ColorType <> ctNone then
-          if ColorSetting.ClassType = TResourceColorSetting then
-            for ResourcePatch in TResourceColorSetting(ColorSetting).Patches do
+    // Collect interesting files
+    for AsarEntry in Asar.Root.Children do
+      if (AsarEntry.ClassType = TASARFile) and IsAnyWild(AsarEntry.Name, Wilds.ToArray) then
+        if AsarEntry.Name.EndsWith('.css') then
+          FileInfos.Add(NewFileInfo(TASARFile(AsarEntry), TCSSDocument.Read(TASARFile(AsarEntry).Contents), ''))
+        else if AsarEntry.Name.EndsWith('.js') then
+          FileInfos.Add(NewFileInfo(TASARFile(AsarEntry), nil, TAsarFile(AsarEntry).Contents.AsString))
+        else
+          raise Exception.Create('Invalid file type');
+
+    // Replace variables with values and collect some information
+    for ColorSetting in FSettings.ColorSettings do
+      if (ColorSetting.ClassType = TColorSettingResource) then
+        for ResourcePatch in ColorSettingResource.Patches do
+        begin
+          Found := False;
+
+          for FileInfo in FileInfos do
+            if Assigned(FileInfo.CssDocument) then
             begin
-              New(ThreadResourcePatchInfo);
-              ZeroMemory(ThreadResourcePatchInfo, SizeOf(TThreadResourcePatchInfo));
-              ThreadResourcePatchInfo.Patch := ResourcePatch;
-              ThreadResourcePatchInfo.Setting := TResourceColorSetting(ColorSetting);
-              ThreadResourcePatchInfos.Add(ThreadResourcePatchInfo);
+              CssValue := FileInfo.CssDocument.FindDeclarationValue(ResourcePatch.SingleSelector, ResourcePatch.DeclarationProp);
+              if not Assigned(CssValue) then
+                Continue;
+
+              try
+                OriginalColorHtml := FileInfo.CssDocument.GetVariableValue(CssValue.Value);
+                OriginalColor := TFunctions.HTMLToColor(OriginalColorHtml);
+              except
+                Continue;
+              end;
+
+              NewColor := ResourcePatch.GetColor(ColorSettingResource.GetColor(ResourcePatch.Options.ColorAdjustment, OriginalColor));
+
+              if not OriginalClassesToColors.ContainsKey(ResourcePatch.DeclarationProp) then
+                OriginalClassesToColors.Add(ResourcePatch.DeclarationProp, OriginalColorHtml);
+
+              if not OriginalColorToColors.ContainsKey(OriginalColorHtml) then
+                OriginalColorToColors.Add(OriginalColorHtml, NewColor);
+
+              if not FDefaultColors.ContainsKey(ColorSettingResource.ID) then
+                FDefaultColors.Add(ColorSettingResource.ID, OriginalColor);
+
+              if ColorSettingResource.ColorType = ctrOriginal then
+              begin
+                Found := True;
+                Break;
+              end;
+
+              CssValue.Value := NewColor;
+
+              if not Found then
+                FLog.Debug('Replacing %s{%s:%s} with %s ("%s")'.Format([ResourcePatch.SingleSelector, ResourcePatch.DeclarationProp, OriginalColorHtml, NewColor, ColorSettingResource.Description]));
+
+              FileInfo.Modified := True;
+              Found := True;
             end;
-
-      ThreadResourcePatchInfos.Sort(@SortResourcePatchInfos);
-
-      if FSettings.HideMaximize then
-      begin
-        AddThreadPatchInfo('#windows-title-minimize{right:90px}', '#windows-title-minimize{right:45px}', [], False, tCss);
-        AddThreadPatchInfo('#windows-title-maximize{position:absolute;width:45px', '#windows-title-maximize{position:absolute;width:0px', [], False, tCss);
-      end;
-
-      for StringReplace in FCssStringReplacements do
-        AddThreadPatchInfo(StringReplace.Search, StringReplace.Replace, StringReplace.ReplaceFlags, False, tCss);
-
-      if not FJsError then
-        for RegExReplace in FJsRegExReplacements do
-          AddThreadPatchInfo(RegExReplace.Search, RegExReplace.Replace, [], True, tJs);
-
-      InitializeCriticalSection(ASARCriticalSection);
-      try
-        FLog.Debug('Starting threads');
-
-        ThreadHandles := [];
-        for AsarEntry in Asar.Root.Children do
-          if (AsarEntry.ClassType = TASARFile) and (AsarEntry <> AsarPreloadJs) and (AsarEntry.Name.EndsWith('.js', True) or AsarEntry.Name.EndsWith('.css', True)) then
+          if not Found then
           begin
-            New(ThreadParameter);
-            ZeroMemory(ThreadParameter, SizeOf(TThreadParameter));
-            ThreadParameter.AsarFile := TASARFile(AsarEntry);
-            ThreadParameter.ResourcePatchInfos := ThreadResourcePatchInfos;
-            ThreadParameter.PatchInfos := ThreadPatchInfos;
-            ThreadParameter.Settings := FSettings;
-            ThreadParameter.ASARCriticalSection := @ASARCriticalSection;
-            ThreadParameters.Add(ThreadParameter);
+            FCssError := True;
+            FLog.Error('%s{%s} ("%s") could not be found'.Format([ResourcePatch.SingleSelector, ResourcePatch.DeclarationProp, ColorSetting.Description]));
+          end;
+        end;
 
-            SetLength(ThreadHandles, Length(ThreadHandles) + 1);
-            ThreadHandles[High(ThreadHandles)] := CreateThread(nil, 0, @PatchThread, ThreadParameter, 0, Dummy);
+    // Process UpdateAllColors/UpdateInFile using previously collected information
+    for ColorSetting in FSettings.ColorSettings do
+      if (ColorSetting.ClassType = TColorSettingResource) then
+        for ResourcePatch in ColorSettingResource.Patches do
+        begin
+          if ResourcePatch.Options.UpdateAllColors then
+          begin
+            PatchReplaceCount := 0;
+
+            for FileInfo in FileInfos do
+              if Assigned(FileInfo.CssDocument) then
+              begin
+                if not OriginalClassesToColors.ContainsKey(ResourcePatch.DeclarationProp) or not OriginalColorToColors.ContainsKey(OriginalClassesToColors[ResourcePatch.DeclarationProp]) then
+                  Continue;
+
+                ReplaceCount := FileInfo.CssDocument.SetDeclarationValuesByValue(OriginalClassesToColors[ResourcePatch.DeclarationProp], OriginalColorToColors[OriginalClassesToColors[ResourcePatch.DeclarationProp]]);
+
+                if ReplaceCount > 0 then
+                  FileInfo.Modified := True;
+
+                PatchReplaceCount += ReplaceCount;
+              end;
+
+            if PatchReplaceCount > 0 then
+              FLog.Debug('Replaced %d occurences of "%s" with "%s"'.Format([PatchReplaceCount, OriginalClassesToColors[ResourcePatch.DeclarationProp], OriginalColorToColors[OriginalClassesToColors[ResourcePatch.DeclarationProp]]]))
+            else
+            begin
+              FCssError := True;
+              FLog.Error('"%s" could not be found'.Format([OriginalClassesToColors[ResourcePatch.DeclarationProp]]));
+            end;
           end;
 
-        WaitForMultipleObjects(Length(ThreadHandles), @ThreadHandles[0], True, INFINITE);
+          if ResourcePatch.Options.UpdateInFile <> '' then
+          begin
+            PatchReplaceCount := 0;
 
-        FLog.Debug('Finished');
-      finally
-        DeleteCriticalSection(ASARCriticalSection);
+            for FileInfo in FileInfos do
+              if IsWild(FileInfo.AsarFile.Name, ResourcePatch.Options.UpdateInFile, True) and (FileInfo.Js <> '') then
+              begin
+                FileInfo.Js := StringReplace(FileInfo.Js, OriginalClassesToColors[ResourcePatch.DeclarationProp], OriginalColorToColors[OriginalClassesToColors[ResourcePatch.DeclarationProp]], [rfIgnoreCase], ReplaceCount);
+                if ReplaceCount > 0 then
+                begin
+                  PatchReplaceCount += ReplaceCount;
+                  FileInfo.Modified := True;
+                end;
+              end;
+
+            if PatchReplaceCount > 0 then
+              FLog.Debug('Replaced %d occurences of "%s" with "%s"'.Format([PatchReplaceCount, OriginalClassesToColors[ResourcePatch.DeclarationProp], OriginalColorToColors[OriginalClassesToColors[ResourcePatch.DeclarationProp]]]))
+            else
+            begin
+              FCssError := True;
+              FLog.Error('"%s" could not be found'.Format([OriginalClassesToColors[ResourcePatch.DeclarationProp]]));
+            end;
+          end;
+        end;
+
+    // Perform non-color modifications from settings
+    for FileInfo in FileInfos do
+      if Assigned(FileInfo.CssDocument) then
+      begin
+        if FSettings.RemoveRoundedElementCorners then
+          for CssRule in FileInfo.CssDocument.Rules do
+          begin
+            CssDeclaration := CssRule.FindDeclarationByProp('border-radius');
+            if not Assigned(CssDeclaration) or CssDeclaration.Value.Value.EndsWith('%') then
+              Continue;
+
+            CssRule.Declarations.Remove(CssDeclaration);
+            CssDeclaration.Free;
+
+            FileInfo.Modified := True;
+          end;
+
+        if FSettings.UseRegularTitleBar then
+        begin
+          CssRule := FileInfo.CssDocument.FindRule('html[dir] #windows-title-bar');
+          if Assigned(CssRule) then
+          begin
+            CssRule.Declarations.Add(TCSSDeclaration.Create('display', 'none'));
+
+            FileInfo.Modified := True;
+          end;
+
+          CssRule := FileInfo.CssDocument.FindRule('#app.windows-native-app');
+          if Assigned(CssRule) then
+          begin
+            CssDeclaration := CssRule.FindDeclarationByProp('top');
+            CssRule.Declarations.Remove(CssDeclaration);
+            CssDeclaration.Free;
+
+            CssDeclaration := CssRule.FindDeclarationByProp('height');
+            CssRule.Declarations.Remove(CssDeclaration);
+            CssDeclaration.Free;
+
+            FileInfo.Modified := True;
+          end;
+        end else
+        begin
+          if FSettings.HideMaximize then
+          begin
+            CssRule := FileInfo.CssDocument.FindRule('html[dir=ltr] #windows-title-minimize');
+            if Assigned(CssRule) then
+            begin
+              CssRule.FindDeclarationByProp('right').Value.Value := '45px';
+              FileInfo.Modified := True;
+            end;
+
+            CssRule := FileInfo.CssDocument.FindRule('#windows-title-maximize');
+            if Assigned(CssRule) then
+            begin
+              CssRule.FindDeclarationByProp('width').Value.Value := '0px';
+              FileInfo.Modified := True;
+            end;
+          end;
+
+          for Selector in SetOpacityOne do
+          begin
+            CssRule := FileInfo.CssDocument.FindRule(Selector);
+            if Assigned(CssRule) then
+            begin
+              CssRule.FindDeclarationByProp('opacity').Value.Value := '1';
+              FileInfo.Modified := True;
+            end;
+          end;
+
+          for Selector in AddCursorDefault do
+          begin
+            CssRule := FileInfo.CssDocument.FindRule(Selector);
+            if Assigned(CssRule) then
+            begin
+              CssRule.Declarations.Add(TCSSDeclaration.Create('cursor', 'default'));
+              FileInfo.Modified := True;
+            end;
+          end;
+        end;
       end;
 
-      FLog.Debug('Patch results:');
-
-      for ThreadPatchInfo in ThreadPatchInfos do
-        if ThreadPatchInfo.Matches = 0 then
-        begin
-          FJsError := FJsError or (ThreadPatchInfo.Target = tJs);
-          FCssError := FCssError or (ThreadPatchInfo.Target = tCss);
-          FLog.Error('  "%s" could not be found'.Format([ThreadPatchInfo.Search]));
-        end else
-          FLog.Debug('  Replaced %d occurences of "%s"'.Format([ThreadPatchInfo.Matches, ThreadPatchInfo.Search]));
-
-      for ThreadResourcePatchInfo in ThreadResourcePatchInfos do
-        if ThreadResourcePatchInfo.Matches = 0 then
-        begin
-          FLog.Error('  "%s" (%s) could not be found'.Format([ThreadResourcePatchInfo.Patch.SearchText, ThreadResourcePatchInfo.Setting.Description]));
-          FCssError := True;
-        end else
-          FLog.Debug('  Replaced %d occurences of "%s" (%s)'.Format([ThreadResourcePatchInfo.Matches, ThreadResourcePatchInfo.Patch.SearchText, ThreadResourcePatchInfo.Setting.Description]));
-
-      for ThreadParameter in ThreadParameters do
-        if ThreadParameter.Exception <> '' then
-          FLog.Debug('Thread excepted: %s'.Format([ThreadParameter.Exception]))
-        else if ThreadParameter.Modified and (not (FJsError and ThreadParameter.AsarFile.Name.EndsWith('.js', True))) then
-        begin
-          FLog.Debug('File "%s" was modified'.Format([ThreadParameter.AsarFile.Name]));
-          FileUpdates.Add(ThreadParameter.AsarFile.JSONObject, ThreadParameter.Result);
-        end;
-    finally
-      for ThreadResourcePatchInfo in ThreadResourcePatchInfos do
-        Dispose(ThreadResourcePatchInfo);
-      ThreadResourcePatchInfos.Free;
-
-      for ThreadPatchInfo in ThreadPatchInfos do
-        Dispose(ThreadPatchInfo);
-      ThreadPatchInfos.Free;
-
-      for ThreadParameter in ThreadParameters do
-        Dispose(ThreadParameter);
-      ThreadParameters.Free;
-    end;
-
+    // Patch JavaScript
     if not FJsError then
-    begin
-      PreloadJs := FPreloadJsPatch + PreloadJs;
-      FileUpdates.Add(AsarPreloadJs.JSONObject, PreloadJs);
-    end;
+      for RegExReplace in JsRegExReplacements do
+      begin
+        PatchReplaceCount := 0;
+
+        for FileInfo in FileInfos do
+          if IsAnyWild(FileInfo.AsarFile.Name, RegExReplace.FilePattern) and (FileInfo.Js <> '') then
+          begin
+            RegEx := TRegExpr.Create;
+            RegEx.ModifierI := True;
+            RegEx.ModifierM := True;
+            RegEx.Expression := RegExReplace.Search;
+            try
+              StrLen := FileInfo.Js.Length;
+              FileInfo.Js := RegEx.Replace(FileInfo.Js, RegExReplace.Replace, True);
+
+              if FileInfo.Js.Length <> StrLen then
+              begin
+                FileInfo.Modified := True;
+                Inc(PatchReplaceCount);
+              end;
+            finally
+              RegEx.Free;
+            end;
+          end;
+
+        if PatchReplaceCount > 0 then
+          FLog.Debug('Replaced %d occurences of "%s"'.Format([PatchReplaceCount, RegExReplace.Search]))
+        else
+        begin
+          FJsError := True;
+          FLog.Error('"%s" could not be found'.Format([RegExReplace.Search]));
+        end;
+      end;
+
 
     FileOffset := Asar.Size - Asar.Header.ContentOffset;
-    for FileUpdate in FileUpdates do
-    begin
-      FileUpdate.Key.Integers['size'] := FileUpdate.Value.Length;
-      FileUpdate.Key.Strings['offset'] := IntToStr(FileOffset);
 
-      FResources.Write(FileUpdate.Value[1], FileUpdate.Value.Length);
+    for FileInfo in FileInfos do
+      if FileInfo.Modified then
+      begin
+        if Assigned(FileInfo.CssDocument) then
+        begin
+          Stream := TMemoryStream.Create;
+          try
+            FileInfo.CssDocument.Write(Stream);
+            FileInfo.AsarFile.Contents.AssignFrom(Stream);
+          finally
+            Stream.Free;
+          end;
+        end else
+          FileInfo.AsarFile.Contents.AssignFrom(FileInfo.Js);
 
-      FileOffset += FileUpdate.Value.Length;
-    end;
+        FileInfo.AsarFile.JSONObject.Integers['size'] := FileInfo.AsarFile.Size;
+        FileInfo.AsarFile.JSONObject.Strings['offset'] := IntToStr(FileOffset);
+
+        FResources.CopyFrom(FileInfo.AsarFile.Contents, 0);
+
+        FileOffset += FileInfo.AsarFile.Size;
+
+        FLog.Debug('Modified "%s"'.Format([FileInfo.AsarFile.Name]));
+      end;
 
     FContentOffset := Asar.Header.ContentOffset;
 
     Asar.Header.Write(FJSON);
   finally
-    FileUpdates.Free;
     Asar.Free;
+
+    Wilds.Free;
+    OriginalClassesToColors.Free;
+    OriginalColorToColors.Free;
+
+    for FileInfo in FileInfos do
+    begin
+      if Assigned(FileInfo.CssDocument) then
+        FileInfo.CssDocument.Free;
+      Dispose(FileInfo);
+    end;
+    FileInfos.Free;
   end;
 
   FLog.Info('Patching finished');

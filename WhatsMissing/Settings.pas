@@ -16,77 +16,93 @@ uses
   SysUtils;
 
 type
-  TColorType = (ctNone, ctImmersive, ctCustom);
+  TColorTypeSimple = (ctsImmersive, ctsCustom);
+  TColorTypeResource = (ctrOriginal, ctrImmersive, ctrCustom);
   TColorAdjustment = (caDarken10 = -50, caDarken5 = -25, caDarken3 = -15, caDarken2 = -10, caDarken = -5, caNone = 0, caLighten = 5, caLighten2 = 10, caLighten3 = 15, caLighten5 = 25);
 
-  { TColorSetting }
+  TColorSettingResourcePatch = class;
+  TColorSettingResourcePatchArray = array of TColorSettingResourcePatch;
 
-  TColorSetting = class
+  { TColorSettingBase }
+
+  TColorSettingBase = class
   protected
     FID: Integer;
     FDescription: string;
-    FColorDefault: TColor;
     FColorCustom: TColor;
     FColorImmersive: TImmersiveColorType;
-    FColorType: TColorType;
   public
-    constructor Create(const ID: Integer; const Description: string; const ColorDefault: TColor; const ColorImmersive: TImmersiveColorType; const Action: TColorType); overload;
-    constructor Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType; const Action: TColorType); overload;
-    destructor Destroy; override;
-
-    function GetColor(const ColorAdjustment: TColorAdjustment): TColor;
+    constructor Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType);
 
     property ID: Integer read FID;
     property Description: string read FDescription;
-    property ColorDefault: TColor read FColorDefault write FColorDefault;
     property ColorCustom: TColor read FColorCustom write FColorCustom;
     property ColorImmersive: TImmersiveColorType read FColorImmersive;
-    property ColorType: TColorType read FColorType write FColorType;
   end;
 
-  TTarget = (tCss, tJs);
+  { TColorSettingSimple }
 
-  { TResourceColorSettingPatch }
-
-  TResourceColorSettingPatch = class
-  private
-    FSearchText: string;
-    FReplaceText: string;
-    FRGBNotation: Boolean;
-    FColorAdjustment: TColorAdjustment;
-    FTarget: TTarget;
-    FReplaceFlags: TReplaceFlags;
+  TColorSettingSimple = class(TColorSettingBase)
+  protected
+    FColorType: TColorTypeSimple;
   public
-    constructor Create(const SearchColor: string); overload;
-    constructor Create(const SearchText, ReplaceText: string); overload;
+    constructor Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType); reintroduce;
 
-    function RBG: TResourceColorSettingPatch;
-    function Darken: TResourceColorSettingPatch;
-    function Darken3: TResourceColorSettingPatch;
-    function Darken5: TResourceColorSettingPatch;
-    function Darken10: TResourceColorSettingPatch;
-    function Lighten3: TResourceColorSettingPatch;
-    function JS: TResourceColorSettingPatch;
+    function GetColor(const ColorAdjustment: TColorAdjustment): TColor;
 
-    function Execute(const Source: string; const Color: TColor; out Count: Integer): string;
-
-    property SearchText: string read FSearchText;
-    property ColorAdjustment: TColorAdjustment read FColorAdjustment;
-    property Target: TTarget read FTarget;
+    property ColorType: TColorTypeSimple read FColorType write FColorType;
   end;
 
-  TResourceColorSettingPatchArray = array of TResourceColorSettingPatch;
+  { TColorSettingResource }
 
-  { TResourceColorSetting }
-
-  TResourceColorSetting = class(TColorSetting)
+  TColorSettingResource = class(TColorSettingBase)
   private
-    FPatches: TResourceColorSettingPatchArray;
+    FColorType: TColorTypeResource;
+    FPatches: TColorSettingResourcePatchArray;
   public
-    constructor Create(const ID: Integer; const Description: string; const ColorCustom: TColor; const ColorImmersive: TImmersiveColorType; const Action: TColorType; const Patches: TResourceColorSettingPatchArray);
+    constructor Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType; const Patches: TColorSettingResourcePatchArray); reintroduce;
     destructor Destroy; override;
 
-    property Patches: TResourceColorSettingPatchArray read FPatches;
+    function GetColor(const ColorAdjustment: TColorAdjustment; const DefaultColor: TColor): TColor;
+
+    property ColorType: TColorTypeResource read FColorType write FColorType;
+    property Patches: TColorSettingResourcePatchArray read FPatches;
+  end;
+
+  { TColorSettingResourcePatch }
+
+  TColorSettingResourcePatch = class
+  private
+    type
+      TPatchOptions = record
+        UpdateAllColors: Boolean;
+        UpdateInFile: string;
+        ColorAdjustment: TColorAdjustment;
+        RGBNotation: Boolean;
+      end;
+  private
+  var
+    FSingleSelector: string;
+    FDeclarationProp: string;
+    FOptions: TPatchOptions;
+  public
+    constructor Create(const DeclarationProp: string); overload;
+    constructor Create(const SingleSelector, DeclarationProp: string); overload;
+
+    function GetColor(const Color: TColor): string;
+
+    function RGB: TColorSettingResourcePatch;
+    function Darken: TColorSettingResourcePatch;
+    function Darken3: TColorSettingResourcePatch;
+    function Darken5: TColorSettingResourcePatch;
+    function Darken10: TColorSettingResourcePatch;
+    function Lighten3: TColorSettingResourcePatch;
+    function UpdateAllColors: TColorSettingResourcePatch;
+    function UpdateInFile(FilenameWild: string): TColorSettingResourcePatch;
+
+    property SingleSelector: string read FSingleSelector;
+    property DeclarationProp: string read FDeclarationProp;
+    property Options: TPatchOptions read FOptions;
   end;
 
   { TSettings }
@@ -97,14 +113,16 @@ type
 
     FLastUsedWhatsAppHash: Integer;
 
-    FColorSettings: TList<TColorSetting>;
-    FNotificationIconBadgeColor: TColorSetting;
-    FNotificationIconBadgeTextColor: TColorSetting;
+    FColorSettings: TList<TColorSettingBase>;
+    FNotificationIconBadgeColor: TColorSettingSimple;
+    FNotificationIconBadgeTextColor: TColorSettingSimple;
 
     FShowNotificationIcon: Boolean;
     FShowUnreadMessagesBadge: Boolean;
     FUsePreRenderedOverlays: Boolean;
     FExcludeUnreadMessagesMutedChats: Boolean;
+    FRemoveRoundedElementCorners: Boolean;
+    FUseRegularTitleBar: Boolean;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
     FSuppressPresenceAvailable: Boolean;
@@ -126,12 +144,14 @@ type
 
     property LastUsedWhatsAppHash: Integer read FLastUsedWhatsAppHash write FLastUsedWhatsAppHash;
 
-    property ColorSettings: TList<TColorSetting> read FColorSettings;
+    property ColorSettings: TList<TColorSettingBase> read FColorSettings;
 
     property ShowNotificationIcon: Boolean read FShowNotificationIcon write FShowNotificationIcon;
     property ShowUnreadMessagesBadge: Boolean read FShowUnreadMessagesBadge write FShowUnreadMessagesBadge;
     property UsePreRenderedOverlays: Boolean read FUsePreRenderedOverlays write FUsePreRenderedOverlays;
     property ExcludeUnreadMessagesMutedChats: Boolean read FExcludeUnreadMessagesMutedChats write FExcludeUnreadMessagesMutedChats;
+    property RemoveRoundedElementCorners: Boolean read FRemoveRoundedElementCorners write FRemoveRoundedElementCorners;
+    property UseRegularTitleBar: Boolean read FUseRegularTitleBar write FUseRegularTitleBar;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
     property SuppressPresenceAvailable: Boolean read FSuppressPresenceAvailable write FSuppressPresenceAvailable;
@@ -147,7 +167,7 @@ constructor TSettings.Create(const FilePath: string);
 begin
   FFilePath := FilePath;
 
-  FColorSettings := TList<TColorSetting>.Create;
+  FColorSettings := TList<TColorSettingBase>.Create;
 
   Reset;
 
@@ -156,7 +176,7 @@ end;
 
 destructor TSettings.Destroy;
 var
-  ColorSetting: TColorSetting;
+  ColorSetting: TColorSettingBase;
 begin
   for ColorSetting in FColorSettings do
     ColorSetting.Free;
@@ -171,7 +191,7 @@ var
   JSONEnum: TJSONEnum;
   JSONObject, JSONObjectResource: TJSONObject;
   JSONArray: TJSONArray;
-  ColorSetting: TColorSetting;
+  ColorSetting: TColorSettingBase;
   FS: TFileStream;
 begin
   try
@@ -187,8 +207,10 @@ begin
         FLastUsedWhatsAppHash := JSONObject.Get('LastUsedWhatsAppHash', FLastUsedWhatsAppHash);
         FShowNotificationIcon := JSONObject.Get('ShowNotificationIcon', FShowNotificationIcon);
         FShowUnreadMessagesBadge := JSONObject.Get('ShowUnreadMessagesBadge', FShowUnreadMessagesBadge);
+        FRemoveRoundedElementCorners := JSONObject.Get('RemoveRoundedElementCorners', FRemoveRoundedElementCorners);
         FUsePreRenderedOverlays := JSONObject.Get('UsePreRenderedOverlays', FUsePreRenderedOverlays);
         FExcludeUnreadMessagesMutedChats := JSONObject.Get('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
+        FUseRegularTitleBar := JSONObject.Get('UseRegularTitleBar', FUseRegularTitleBar);
         FHideMaximize := JSONObject.Get('HideMaximize', FHideMaximize);
         FAlwaysOnTop := JSONObject.Get('AlwaysOnTop', FAlwaysOnTop);
         FSuppressPresenceAvailable := JSONObject.Get('SuppressPresenceAvailable', FSuppressPresenceAvailable);
@@ -203,8 +225,13 @@ begin
           for ColorSetting in FColorSettings do
             if ColorSetting.ID = JSONObjectResource.Get('ID', -1) then
             begin
-              ColorSetting.ColorType := TColorType(JSONObjectResource.Get('Action', 0));
               ColorSetting.ColorCustom := JSONObjectResource.Get('ColorCustom', 0);
+
+              if ColorSetting is TColorSettingResource then
+                TColorSettingResource(ColorSetting).ColorType := TColorTypeResource(JSONObjectResource.Get('Action', Byte(ctrImmersive)))
+              else
+                TColorSettingSimple(ColorSetting).ColorType := TColorTypeSimple(JSONObjectResource.Get('Action', Byte(ctsImmersive)));
+
               Break;
             end;
         end;
@@ -224,7 +251,7 @@ var
   JSONString: AnsiString;
   JSONObject, JSONObjectResource: TJSONObject;
   JSONArray: TJSONArray;
-  ColorSetting: TColorSetting;
+  ColorSetting: TColorSettingBase;
   FS: TFileStream;
 begin
   if not DirectoryExists(ExtractFileDir(FFilePath)) then
@@ -238,6 +265,8 @@ begin
     JSONObject.Add('ShowUnreadMessagesBadge', FShowUnreadMessagesBadge);
     JSONObject.Add('UsePreRenderedOverlays', FUsePreRenderedOverlays);
     JSONObject.Add('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
+    JSONObject.Add('RemoveRoundedElementCorners', FRemoveRoundedElementCorners);
+    JSONObject.Add('UseRegularTitleBar', FUseRegularTitleBar);
     JSONObject.Add('HideMaximize', FHideMaximize);
     JSONObject.Add('AlwaysOnTop', FAlwaysOnTop);
     JSONObject.Add('SuppressPresenceAvailable', FSuppressPresenceAvailable);
@@ -253,8 +282,12 @@ begin
       JSONArray.Add(JSONObjectResource);
 
       JSONObjectResource.Add('ID', ColorSetting.ID);
-      JSONObjectResource.Add('Action', Integer(ColorSetting.ColorType));
       JSONObjectResource.Add('ColorCustom', ColorSetting.ColorCustom);
+
+      if ColorSetting is TColorSettingResource then
+        JSONObjectResource.Add('Action', Integer(TColorSettingResource(ColorSetting).ColorType))
+      else
+        JSONObjectResource.Add('Action', Integer(TColorSettingSimple(ColorSetting).ColorType));
     end;
 
     FS := TFileStream.Create(FFilePath, fmCreate);
@@ -278,6 +311,8 @@ begin
   MMF.ExcludeUnreadMessagesMutedChats := FExcludeUnreadMessagesMutedChats;
   MMF.NotificationIconBadgeColor := ColorToRGB(FNotificationIconBadgeColor.GetColor(caNone));
   MMF.NotificationIconBadgeTextColor := ColorToRGB(FNotificationIconBadgeTextColor.GetColor(caNone));
+  MMF.RemoveRoundedElementCorners := FRemoveRoundedElementCorners;
+  MMF.UseRegularTitleBar := FUseRegularTitleBar;
   MMF.HideMaximize := FHideMaximize;
   MMF.AlwaysOnTop := FAlwaysOnTop;
   MMF.SuppressPresenceAvailable := FSuppressPresenceAvailable;
@@ -287,86 +322,93 @@ end;
 
 procedure TSettings.Reset;
 var
-  ColorSetting: TColorSetting;
+  ColorSetting: TColorSettingBase;
 begin
   for ColorSetting in FColorSettings do
     ColorSetting.Free;
   FColorSettings.Clear;
 
-  FNotificationIconBadgeColor := TColorSetting.Create(500, 'Notification icon badge', ImmersiveLightWUError, ctImmersive);
+  FNotificationIconBadgeColor := TColorSettingSimple.Create(500, 'Notification icon badge', ImmersiveLightWUError);
 
-  FNotificationIconBadgeTextColor := TColorSetting.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted, ctImmersive);
+  FNotificationIconBadgeTextColor := TColorSettingSimple.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted);
 
-  // --teal-lighter
-  FColorSettings.Add(TResourceColorSetting.Create(1, 'Titlebar', TFunctions.HTMLToColor('00a884'), ImmersiveSystemAccent, ctImmersive, [TResourceColorSettingPatch.Create('00a884')]));
-
-  // --badge-pending, --teal, --active-tab-marker, --app-background-stripe, --checkbox-background, --highlight, --panel-background-colored-deeper
-  FColorSettings.Add(TResourceColorSetting.Create(10, 'Panel background', TFunctions.HTMLToColor('009688'), ImmersiveSaturatedBackground, ctImmersive, [TResourceColorSettingPatch.Create('009688')]));
-
-  // --intro-border
-  FColorSettings.Add(TResourceColorSetting.Create(2, 'Intro border', TFunctions.HTMLToColor('25d366'), ImmersiveLightBorder, ctImmersive, [TResourceColorSettingPatch.Create('25d366')]));
-
-  // --progress-primary
-  FColorSettings.Add(TResourceColorSetting.Create(3, 'Progressbar', TFunctions.HTMLToColor('00c298'), ImmersiveControlLightProgressForeground, ctImmersive, [TResourceColorSettingPatch.Create('00c298')]));
+  FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter')]));
 
   FColorSettings.Add(FNotificationIconBadgeColor);
 
   FColorSettings.Add(FNotificationIconBadgeTextColor);
 
-  // --ptt-green
-  FColorSettings.Add(TResourceColorSetting.Create(11, 'New voice mail icon', TFunctions.HTMLToColor('09d261'), ImmersiveLightWUError, ctImmersive, [TResourceColorSettingPatch.Create('09d261'), TResourceColorSettingPatch.Create('09D261').JS]));
+  FColorSettings.Add(TColorSettingResource.Create(18, 'Application startup', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--startup-background'),
+    TColorSettingResourcePatch.Create('--startup-background-rgb').RGB,
+    TColorSettingResourcePatch.Create('--startup-icon')]));
 
-  // --ptt-blue, --icon-ack
-  FColorSettings.Add(TResourceColorSetting.Create(12, 'Acknowledged icons', TFunctions.HTMLToColor('4fc3f7'), ImmersiveLightWUNormal, ctImmersive, [TResourceColorSettingPatch.Create('4fc3f7')]));
+  FColorSettings.Add(TColorSettingResource.Create(19, 'Intro', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--intro-background'), TColorSettingResourcePatch.Create('--intro-border').Darken10]));
 
-  // --typing
-  FColorSettings.Add(TResourceColorSetting.Create(13, '"Typing..." notification', TFunctions.HTMLToColor('1fa855'), ImmersiveSaturatedCommandRowPressed, ctImmersive, [TResourceColorSettingPatch.Create('1fa855')]));
+  FColorSettings.Add(TColorSettingResource.Create(20, 'Panel background', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--panel-header-background'),
+    TColorSettingResourcePatch.Create('--panel-input-background'), TColorSettingResourcePatch.Create('--search-input-container-background'),
+    TColorSettingResourcePatch.Create('--search-input-container-background-active'), TColorSettingResourcePatch.Create('--rich-text-panel-background'), TColorSettingResourcePatch.Create('--compose-panel-background')]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(4, 'Unread message badge', TFunctions.HTMLToColor('25d366'), ImmersiveLightWUError, ctImmersive, [TResourceColorSettingPatch.Create('--unread-marker-background:#25d366;',
-    '--unread-marker-background:#%COLOR%;')]));
+  FColorSettings.Add(TColorSettingResource.Create(21, 'Modal background', ImmersiveSaturatedBackground, [
+    TColorSettingResourcePatch.Create('--teal'), TColorSettingResourcePatch.Create('--app-background-stripe'),
+    TColorSettingResourcePatch.Create('--checkbox-background').Lighten3, TColorSettingResourcePatch.Create('--panel-background-colored').Lighten3.UpdateAllColors]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(14, 'Primary button background', TFunctions.HTMLToColor('05cd51'), ImmersiveControlDefaultLightButtonBackgroundRest, ctImmersive,
-    [TResourceColorSettingPatch.Create('--button-primary-background:#008069;', '--button-primary-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-primary-background-hover:#017561;',
-    '--button-primary-background-hover:#%COLOR%;').Darken3]));
+  FColorSettings.Add(TColorSettingResource.Create(22, 'Chat list', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--background-default')]));
+  FColorSettings.Add(TColorSettingResource.Create(23, 'Chat list (hovered)', ImmersiveLightEntityItemBackgroundHover, [TColorSettingResourcePatch.Create('--background-default-hover')]));
+  FColorSettings.Add(TColorSettingResource.Create(24, 'Chat list (focused)', ImmersiveLightHoverBackground, [TColorSettingResourcePatch.Create('--background-default-active')]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(15, 'Secondary button background', TFunctions.HTMLToColor('ffffff'), ImmersiveControlLightButtonBackgroundRest, ctImmersive,
-    [TResourceColorSettingPatch.Create('--button-secondary-background:#fff;', '--button-secondary-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-secondary-background-hover:#fff;',
-    '--button-secondary-background-hover:#%COLOR%;').Darken3]));
+  FColorSettings.Add(TColorSettingResource.Create(3, 'Progressbar', ImmersiveControlLightProgressForeground, [TColorSettingResourcePatch.Create('--progress-primary')]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(16, 'Secondary button text', TFunctions.HTMLToColor('07bc4c'), ImmersiveControlLightAppButtonTextRest, ctImmersive, [TResourceColorSettingPatch.Create(
-    '--button-secondary:#008069;', '--button-secondary:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-secondary-hover:#017561;', '--button-secondary-hover:#%COLOR%;').Lighten3]));
+  FColorSettings.Add(TColorSettingResource.Create(25, 'Input background', ImmersiveControlContextMenuBackgroundRest, [TColorSettingResourcePatch.Create('--search-input-background'),
+    TColorSettingResourcePatch.Create('--compose-input-background')]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(17, 'Round button background', TFunctions.HTMLToColor('09e85e'), ImmersiveControlLightButtonBackgroundRest, ctImmersive,
-    [TResourceColorSettingPatch.Create('--button-round-background:#00a884;', '--button-round-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--button-round-background-rgb:0,168,132;',
-    '--button-round-background-rgb:#%COLOR%;').RBG]));
+  FColorSettings.Add(TColorSettingResource.Create(26, 'Icons', ImmersiveSystemAccentLight2, [TColorSettingResourcePatch.Create('--button-round-icon-inverted').UpdateInFile('svg.*.js'),
+    TColorSettingResourcePatch.Create('--icon'), TColorSettingResourcePatch.Create('--panel-header-icon'), TColorSettingResourcePatch.Create('--icon-search-back')]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(8, 'Background of incoming messages', TFunctions.HTMLToColor('ffffff'), ImmersiveLightChromeMedium, ctImmersive,
-    [TResourceColorSettingPatch.Create('--incoming-background:#fff;', '--incoming-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--incoming-background-rgb:255,255,255;',
-    '--incoming-background-rgb:%COLOR%;').RBG, TResourceColorSettingPatch.Create('--incoming-background-deeper:#f5f6f6;', '--incoming-background-deeper:#%COLOR%;').Darken,
-    TResourceColorSettingPatch.Create('--incoming-background-deeper-rgb:245,246,246;', '--incoming-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourceColorSettingPatch.Create(
-    '--audio-track-incoming:#e7e8e9;', '--audio-track-incoming:#%COLOR%;').Darken3, TResourceColorSettingPatch.Create('--audio-progress-incoming:#4ada80;', '--audio-progress-incoming:#%COLOR%;').Darken10,
-    TResourceColorSettingPatch.Create('--audio-progress-played-incoming:#30b0e8;', '--audio-progress-played-incoming:#%COLOR%;').Darken10]));
+  FColorSettings.Add(TColorSettingResource.Create(11, 'New voice mail icon', ImmersiveLightWUError, [TColorSettingResourcePatch.Create('--ptt-green').UpdateInFile('svg.*.js')]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(9, 'Background of outgoing messages', TFunctions.HTMLToColor('dcf8c6'), ImmersiveLightChromeWhite, ctImmersive, [TResourceColorSettingPatch.Create(
-    '--outgoing-background:#d9fdd3;', '--outgoing-background:#%COLOR%;'), TResourceColorSettingPatch.Create('--outgoing-background-rgb:217,253,211;', '--outgoing-background-rgb:%COLOR%;').RBG,
-    TResourceColorSettingPatch.Create('--outgoing-background-deeper:#d1f4cc;', '--outgoing-background-deeper:#%COLOR%;').Darken, TResourceColorSettingPatch.Create('--outgoing-background-deeper-rgb:209,244,204;',
-    '--outgoing-background-deeper-rgb:%COLOR%;').RBG.Darken, TResourceColorSettingPatch.Create('--audio-track-outgoing:#c5e6c1;', '--audio-track-outgoing:#%COLOR%;').Darken3,
-    TResourceColorSettingPatch.Create('--audio-progress-outgoing:#8da78f;', '--audio-progress-outgoing:#%COLOR%;').Darken10, TResourceColorSettingPatch.Create('--audio-progress-played-outgoing:#29afdf;',
-    '--audio-progress-played-outgoing:#%COLOR%;').Darken10]));
+  FColorSettings.Add(TColorSettingResource.Create(12, 'Acknowledged icons', ImmersiveLightWUNormal, [TColorSettingResourcePatch.Create('--icon-ack')]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(5, 'Minimize button hover color', TFunctions.HTMLToColor('00ab97'), ImmersiveControlDefaultLightButtonBackgroundHover, ctImmersive,
-    [TResourceColorSettingPatch.Create('#windows-title-minimize:hover{background-color:var(--teal-hover)}', '#windows-title-minimize:hover{background-color:#%COLOR%}')]));
+  FColorSettings.Add(TColorSettingResource.Create(13, '"Typing..." notification', ImmersiveSaturatedCommandRowPressed, [TColorSettingResourcePatch.Create('--typing')]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(6, 'Maximize button hover color', TFunctions.HTMLToColor('00ab97'), ImmersiveControlDefaultLightButtonBackgroundHover, ctImmersive,
-    [TResourceColorSettingPatch.Create('#windows-title-maximize:hover{background-color:var(--teal-hover)}', '#windows-title-maximize:hover{background-color:#%COLOR%}')]));
+  FColorSettings.Add(TColorSettingResource.Create(4, 'Unread message badge', ImmersiveLightWUError, [TColorSettingResourcePatch.Create('--unread-marker-background')]));
 
-  FColorSettings.Add(TResourceColorSetting.Create(7, 'Close button hover color', TFunctions.HTMLToColor('00ab97'), ImmersiveHardwareTitleBarCloseButtonHover, ctImmersive,
-    [TResourceColorSettingPatch.Create('#windows-title-close:hover{background-color:var(--teal-hover)}', '#windows-title-close:hover{background-color:#%COLOR%}')]));
+  FColorSettings.Add(TColorSettingResource.Create(14, 'Primary button background', ImmersiveControlDefaultLightButtonBackgroundRest,
+    [TColorSettingResourcePatch.Create('--button-primary-background'), TColorSettingResourcePatch.Create('--button-primary-background-hover').Darken3]));
+
+  FColorSettings.Add(TColorSettingResource.Create(15, 'Secondary button background', ImmersiveControlLightButtonBackgroundRest,
+    [TColorSettingResourcePatch.Create('--button-secondary-background'), TColorSettingResourcePatch.Create('--button-secondary-background-hover').Darken3]));
+
+  FColorSettings.Add(TColorSettingResource.Create(16, 'Secondary button text', ImmersiveControlLightAppButtonTextRest, [TColorSettingResourcePatch.Create(
+    '--button-secondary'), TColorSettingResourcePatch.Create('--button-secondary-hover').Lighten3]));
+
+  FColorSettings.Add(TColorSettingResource.Create(17, 'Round button background', ImmersiveControlLightButtonBackgroundRest,
+    [TColorSettingResourcePatch.Create('--button-round-background'), TColorSettingResourcePatch.Create('--button-round-background-rgb').RGB]));
+
+  FColorSettings.Add(TColorSettingResource.Create(8, 'Background of incoming messages', ImmersiveLightChromeMedium,
+    [TColorSettingResourcePatch.Create('--incoming-background'), TColorSettingResourcePatch.Create('--incoming-background-rgb').RGB, TColorSettingResourcePatch.Create('--incoming-background-deeper').Darken,
+    TColorSettingResourcePatch.Create('--incoming-background-deeper-rgb').RGB.Darken, TColorSettingResourcePatch.Create('--audio-track-incoming').Darken3, TColorSettingResourcePatch.Create('--audio-progress-incoming').Darken10,
+    TColorSettingResourcePatch.Create('--audio-progress-played-incoming').Darken10]));
+
+  FColorSettings.Add(TColorSettingResource.Create(9, 'Background of outgoing messages', ImmersiveLightChromeWhite, [TColorSettingResourcePatch.Create(
+    '--outgoing-background'), TColorSettingResourcePatch.Create('--outgoing-background-rgb').RGB,
+    TColorSettingResourcePatch.Create('--outgoing-background-deeper').Darken, TColorSettingResourcePatch.Create('--outgoing-background-deeper-rgb').RGB.Darken,
+    TColorSettingResourcePatch.Create('--audio-track-outgoing').Darken3, TColorSettingResourcePatch.Create('--audio-progress-outgoing').Darken10, TColorSettingResourcePatch.Create('--audio-progress-played-outgoing').Darken10]));
+
+  FColorSettings.Add(TColorSettingResource.Create(5, 'Minimize button hover color', ImmersiveControlDefaultLightButtonBackgroundHover,
+    [TColorSettingResourcePatch.Create('html[dir] #windows-title-minimize:hover', 'background-color')]));
+
+  FColorSettings.Add(TColorSettingResource.Create(6, 'Maximize button hover color', ImmersiveControlDefaultLightButtonBackgroundHover,
+    [TColorSettingResourcePatch.Create('html[dir] #windows-title-maximize:hover', 'background-color')]));
+
+  FColorSettings.Add(TColorSettingResource.Create(7, 'Close button hover color', ImmersiveHardwareTitleBarCloseButtonHover,
+    [TColorSettingResourcePatch.Create('html[dir] #windows-title-close:hover', 'background-color')]));
 
   FShowNotificationIcon := True;
   FShowUnreadMessagesBadge := True;
   FUsePreRenderedOverlays := True;
   FExcludeUnreadMessagesMutedChats := False;
+  FRemoveRoundedElementCorners := False;
+  FUseRegularTitleBar := False;
   FHideMaximize := False;
   FAlwaysOnTop := False;
   FSuppressPresenceAvailable := False;
@@ -376,8 +418,9 @@ end;
 
 function TSettings.FGetResourceSettingsChecksum: UInt16;
 var
-  ColorSetting: TColorSetting;
-  ColorType: TColorType;
+  ColorSetting: TColorSettingBase;
+  ResourceColorSetting: TColorSettingResource absolute ColorSetting;
+  ColorType: TColorTypeResource;
   MD5Ctx: TMD5Context;
   MD5Digest: TMD5Digest;
   Color: TColor;
@@ -385,138 +428,157 @@ var
 begin
   MD5Init(MD5Ctx);
   for ColorSetting in FColorSettings do
-    if ColorSetting.ClassType = TResourceColorSetting then
+    if ColorSetting.ClassType = TColorSettingResource then
     begin
-      Color := ColorSetting.GetColor(caNone);
+      Color := ResourceColorSetting.ColorCustom;
       MD5Update(MD5Ctx, Color, SizeOf(Color));
 
-      ColorType := ColorSetting.ColorType;
+      ColorType := ResourceColorSetting.ColorType;
       MD5Update(MD5Ctx, ColorType, SizeOf(ColorType));
     end;
+  Bool := FRemoveRoundedElementCorners;
+  MD5Update(MD5Ctx, Bool, SizeOf(Bool));
+  Bool := FUseRegularTitleBar;
+  MD5Update(MD5Ctx, Bool, SizeOf(Bool));
   Bool := FHideMaximize;
   MD5Update(MD5Ctx, Bool, SizeOf(Bool));
   MD5Final(MD5Ctx, MD5Digest);
   Result := PUInt16(@MD5Digest[0])^;
 end;
 
-{ TColorSetting }
+{ TColorSettingBase }
 
-constructor TColorSetting.Create(const ID: Integer; const Description: string; const ColorDefault: TColor; const ColorImmersive: TImmersiveColorType; const Action: TColorType);
+constructor TColorSettingBase.Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType);
 begin
   FID := ID;
   FDescription := Description;
-  FColorDefault := ColorDefault;
-  FColorCustom := ColorDefault;
   FColorImmersive := ColorImmersive;
-  FColorType := Action;
 end;
 
-constructor TColorSetting.Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType; const Action: TColorType);
+{ TColorSettingSimple }
+
+constructor TColorSettingSimple.Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType);
 begin
-  Create(ID, Description, clNone, ColorImmersive, Action);
-  FColorCustom := GetColor(caNone);
+  inherited Create(ID, Description, ColorImmersive);
+
+  FColorType := ctsImmersive;
 end;
 
-destructor TColorSetting.Destroy;
-begin
-  inherited Destroy;
-end;
-
-function TColorSetting.GetColor(const ColorAdjustment: TColorAdjustment): TColor;
+function TColorSettingSimple.GetColor(const ColorAdjustment: TColorAdjustment): TColor;
 begin
   case FColorType of
-    ctNone:
-      Result := ColorDefault;
-    ctImmersive:
+    ctsImmersive:
       Result := AlphaColorToColor(GetActiveImmersiveColor(ImmersiveColors.TImmersiveColorType(ColorImmersive)));
-    ctCustom:
+    ctsCustom:
       Result := ColorCustom;
     else
-      raise Exception.Create('GetColor(): Invalid action');
+      raise Exception.Create('GetColor(): Invalid ColorType');
   end;
 
   Result := ColorAdjustLuma(Result, Integer(ColorAdjustment), True);
 end;
 
-{ TResourceColorSettingPatch }
+{ TColorSettingResource }
 
-constructor TResourceColorSettingPatch.Create(const SearchColor: string);
+constructor TColorSettingResource.Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType; const Patches: TColorSettingResourcePatchArray);
 begin
-  FSearchText := SearchColor;
-  FReplaceText := '%COLOR%';
-  FReplaceFlags := [rfReplaceAll];
-  FColorAdjustment := caNone;
-end;
-
-constructor TResourceColorSettingPatch.Create(const SearchText, ReplaceText: string);
-begin
-  FSearchText := SearchText;
-  FReplaceText := ReplaceText;
-  FColorAdjustment := caNone;
-end;
-
-function TResourceColorSettingPatch.RBG: TResourceColorSettingPatch;
-begin
-  Result := Self;
-  FRGBNotation := True;
-end;
-
-function TResourceColorSettingPatch.Darken: TResourceColorSettingPatch;
-begin
-  Result := Self;
-  FColorAdjustment := caDarken;
-end;
-
-function TResourceColorSettingPatch.Darken3: TResourceColorSettingPatch;
-begin
-  Result := Self;
-  FColorAdjustment := caDarken3;
-end;
-
-function TResourceColorSettingPatch.Darken5: TResourceColorSettingPatch;
-begin
-  Result := Self;
-  FColorAdjustment := caDarken5;
-end;
-
-function TResourceColorSettingPatch.Darken10: TResourceColorSettingPatch;
-begin
-  Result := Self;
-  FColorAdjustment := caDarken10;
-end;
-
-function TResourceColorSettingPatch.Lighten3: TResourceColorSettingPatch;
-begin
-  Result := Self;
-  FColorAdjustment := caLighten3;
-end;
-
-function TResourceColorSettingPatch.JS: TResourceColorSettingPatch;
-begin
-  Result := Self;
-  FTarget := tJs;
-end;
-
-function TResourceColorSettingPatch.Execute(const Source: string; const Color: TColor; out Count: Integer): string;
-begin
-  Result := StringReplace(Source, FSearchText, FReplaceText.Replace('%COLOR%', IfThen<string>(FRGBNotation, TFunctions.ColorToRGBHTML(Color), TFunctions.ColorToHTML(Color)), []), FReplaceFlags, Count);
-end;
-
-{ TResourceColorSetting }
-
-constructor TResourceColorSetting.Create(const ID: Integer; const Description: string; const ColorCustom: TColor; const ColorImmersive: TImmersiveColorType; const Action: TColorType; const Patches: TResourceColorSettingPatchArray);
-begin
-  inherited Create(ID, Description, ColorCustom, ColorImmersive, Action);
+  inherited Create(ID, Description, ColorImmersive);
 
   FPatches := Patches;
+  FColorType := ctrImmersive;
 end;
 
-destructor TResourceColorSetting.Destroy;
+destructor TColorSettingResource.Destroy;
 var
-  ResourcePatch: TResourceColorSettingPatch;
+  ResourcePatch: TColorSettingResourcePatch;
 begin
   for ResourcePatch in FPatches do
     ResourcePatch.Free;
+end;
+
+function TColorSettingResource.GetColor(const ColorAdjustment: TColorAdjustment; const DefaultColor: TColor): TColor;
+begin
+  case FColorType of
+    ctrOriginal:
+      Result := DefaultColor;
+    ctrImmersive:
+      Result := AlphaColorToColor(GetActiveImmersiveColor(ImmersiveColors.TImmersiveColorType(ColorImmersive)));
+    ctrCustom:
+      Result := ColorCustom;
+    else
+      raise Exception.Create('GetColor(): Invalid ColorType');
+  end;
+
+  Result := ColorAdjustLuma(Result, Integer(ColorAdjustment), True);
+end;
+
+{ TColorSettingResourcePatch }
+
+constructor TColorSettingResourcePatch.Create(const DeclarationProp: string);
+begin
+  FSingleSelector := ':root';
+  FDeclarationProp := DeclarationProp;
+  FOptions.ColorAdjustment := caNone;
+end;
+
+constructor TColorSettingResourcePatch.Create(const SingleSelector, DeclarationProp: string);
+begin
+  FSingleSelector := SingleSelector;
+  FDeclarationProp := DeclarationProp;
+  FOptions.ColorAdjustment := caNone;
+end;
+
+function TColorSettingResourcePatch.GetColor(const Color: TColor): string;
+begin
+  Result := IfThen<string>(FOptions.RGBNotation, TFunctions.ColorToRGBHTML(Color), TFunctions.ColorToHTML(Color));
+end;
+
+function TColorSettingResourcePatch.RGB: TColorSettingResourcePatch;
+begin
+  Result := Self;
+  FOptions.RGBNotation := True;
+end;
+
+function TColorSettingResourcePatch.Darken: TColorSettingResourcePatch;
+begin
+  Result := Self;
+  FOptions.ColorAdjustment := caDarken;
+end;
+
+function TColorSettingResourcePatch.Darken3: TColorSettingResourcePatch;
+begin
+  Result := Self;
+  FOptions.ColorAdjustment := caDarken3;
+end;
+
+function TColorSettingResourcePatch.Darken5: TColorSettingResourcePatch;
+begin
+  Result := Self;
+  FOptions.ColorAdjustment := caDarken5;
+end;
+
+function TColorSettingResourcePatch.Darken10: TColorSettingResourcePatch;
+begin
+  Result := Self;
+  FOptions.ColorAdjustment := caDarken10;
+end;
+
+function TColorSettingResourcePatch.Lighten3: TColorSettingResourcePatch;
+begin
+  Result := Self;
+  FOptions.ColorAdjustment := caLighten3;
+end;
+
+function TColorSettingResourcePatch.UpdateAllColors: TColorSettingResourcePatch;
+begin
+  Result := Self;
+  FOptions.UpdateAllColors := True;
+end;
+
+function TColorSettingResourcePatch.UpdateInFile(FilenameWild: string): TColorSettingResourcePatch;
+begin
+  Result := Self;
+  FOptions.UpdateInFile := FilenameWild;
 end;
 
 end.

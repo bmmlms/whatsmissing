@@ -12,7 +12,6 @@ uses
   Log,
   MMF,
   Paths,
-  Settings,
   SettingsForm,
   SysUtils,
   Windows;
@@ -24,7 +23,8 @@ procedure RunInject;
 var
   MMFLauncher: TMMFLauncher;
   ProcessHandle, ThreadHandle: THandle;
-  ProcessHandleStr, ThreadHandleStr: string;
+  ProcessHandleStr: string = '';
+  ThreadHandleStr: string = '';
 begin
   if TFunctions.FindCmdLineSwitch(PROCESSHANDLE_ARG, ProcessHandleStr) and TFunctions.FindCmdLineSwitch(THREADHANDLE_ARG, ThreadHandleStr) then
   begin
@@ -105,7 +105,8 @@ var
   IsInject, IsSettings, IsPrepareUninstall, IsUninstall, IsLauncher: Boolean;
   StartProcessRes: TStartProcessRes;
   ProcHandle: THandle;
-  UninstallerPath, ParentHandleStr: string;
+  UninstallerPath: string;
+  ParentHandleStr: string = '';
   Log: TLog;
 begin
   IsMultiThread := True;

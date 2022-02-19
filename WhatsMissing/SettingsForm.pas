@@ -3,6 +3,7 @@ unit SettingsForm;
 interface
 
 uses
+  Buttons,
   Classes,
   ComboEx,
   ComCtrls,
@@ -16,35 +17,61 @@ uses
   ImmersiveColors,
   MMF,
   Paths,
-  ResourcePatcher,
   Settings,
-  StdCtrls, Buttons,
+  StdCtrls,
   SysUtils,
   UxTheme,
   Windows;
 
 type
+  { TColorSettingControlBase }
 
-  { TColorSettingControl }
-
-  TColorSettingControl = class(TWinControl)
-  private
+  TColorSettingControlBase = class(TWinControl)
+  protected
     FLabelDescription: TLabel;
     FComboColorType: TComboBoxEx;
     FPanelColorContainer, FPanelColor: TPanel;
 
-    FColorSetting: TColorSetting;
-
-    procedure UpdateColor;
-    procedure ComboReplaceTypeSelect(Sender: TObject);
-    procedure PanelColorClick(Sender: TObject);
-  protected
-    procedure ConfigureComboBox; virtual;
+    procedure UpdateColor; virtual; abstract;
+    procedure ConfigureComboBox; virtual; abstract;
+    procedure PanelColorClick(Sender: TObject); virtual; abstract;
+    procedure ComboReplaceTypeSelect(Sender: TObject); virtual;
 
     procedure SetParent(AParent: TWinControl); override;
     procedure DoOnResize; override;
   public
-    constructor Create(const AOwner: TComponent; const ColorSetting: TColorSetting); reintroduce;
+    constructor Create(const AOwner: TComponent; const ColorSetting: TColorSettingBase); reintroduce;
+  end;
+
+  { TColorSettingControlSimple }
+
+  TColorSettingControlSimple = class(TColorSettingControlBase)
+  private
+    FColorSetting: TColorSettingSimple;
+  protected
+    procedure UpdateColor; override;
+    procedure ConfigureComboBox; override;
+    procedure ComboReplaceTypeSelect(Sender: TObject); override;
+    procedure PanelColorClick(Sender: TObject); override;
+  public
+    constructor Create(const AOwner: TComponent; const ColorSetting: TColorSettingSimple); reintroduce;
+  end;
+
+  { TColorSettingControlResource }
+
+  TColorSettingControlResource = class(TColorSettingControlBase)
+  private
+    FColorSetting: TColorSettingResource;
+    FDefaultColor: TColor;
+    FColorAvailable: Boolean;
+  protected
+    procedure UpdateColor; override;
+    procedure ConfigureComboBox; override;
+    procedure ComboReplaceTypeSelect(Sender: TObject); override;
+    procedure PanelColorClick(Sender: TObject); override;
+  public
+    constructor Create(const AOwner: TComponent; const ColorSetting: TColorSettingResource; DefaultColor: TColor); reintroduce; overload;
+    constructor Create(const AOwner: TComponent; const ColorSetting: TColorSettingResource); reintroduce; overload;
   end;
 
   { TfrmSettings }
@@ -52,6 +79,7 @@ type
   TfrmSettings = class(TForm)
     Bevel1: TBevel;
     btnSave: TBitBtn;
+    chkUseRegularTitleBar: TCheckBox;
     chkShowUnreadMessagesBadge: TCheckBox;
     chkExcludeUnreadMessagesMutedChats: TCheckBox;
     chkUsePreRenderedOverlays: TCheckBox;
@@ -60,6 +88,7 @@ type
     chkSuppressPresenceComposing: TCheckBox;
     chkHideMaximize: TCheckBox;
     chkShowNotificationIcon: TCheckBox;
+    chkRemoveRoundedElementCorners: TCheckBox;
     PageControl1: TPageControl;
     pnlSave: TPanel;
     sbColors: TScrollBox;
@@ -113,9 +142,11 @@ end;
 procedure TfrmSettings.FormShow(Sender: TObject);
 var
   i: Integer;
-  SettingControl: TColorSettingControl;
+  SettingControl: TColorSettingControlBase;
   MeasureCheckBox: TCheckBox;
   CheckBoxRect: TRect;
+  ColorSetting: TColorSettingBase;
+  MMFLauncher: TMMFLauncher;
 begin
   MeasureCheckBox := TCheckBox.Create(Self);
   try
@@ -129,6 +160,8 @@ begin
   chkShowUnreadMessagesBadge.Checked := FSettings.ShowUnreadMessagesBadge;
   chkUsePreRenderedOverlays.Checked := FSettings.UsePreRenderedOverlays;
   chkExcludeUnreadMessagesMutedChats.Checked := FSettings.ExcludeUnreadMessagesMutedChats;
+  chkRemoveRoundedElementCorners.Checked := FSettings.RemoveRoundedElementCorners;
+  chkUseRegularTitleBar.Checked := FSettings.UseRegularTitleBar;
   chkHideMaximize.Checked := FSettings.HideMaximize;
   chkSuppressPresenceAvailable.Checked := FSettings.SuppressPresenceAvailable;
   chkSuppressPresenceComposing.Checked := FSettings.SuppressPresenceComposing;
@@ -140,16 +173,31 @@ begin
   chkUsePreRenderedOverlays.BorderSpacing.Left := CheckBoxRect.Width;
   chkExcludeUnreadMessagesMutedChats.BorderSpacing.Left := CheckBoxRect.Width;
 
-  for i := FSettings.ColorSettings.Count - 1 downto 0 do
-  begin
-    SettingControl := TColorSettingControl.Create(sbColors, FSettings.ColorSettings[i]);
-    SettingControl.Align := alTop;
-    SettingControl.Visible := True;
-    SettingControl.Height := 10;
-    SettingControl.AutoSize := True;
-    SettingControl.Parent := sbColors;
-    if i < FSettings.ColorSettings.Count - 1 then
-      SettingControl.BorderSpacing.Bottom := 4;
+  MMFLauncher := TMMFLauncher.Create(False);
+  try
+    MMFLauncher.Read;
+    for i := FSettings.ColorSettings.Count - 1 downto 0 do
+    begin
+      ColorSetting := FSettings.ColorSettings[i];
+
+      if ColorSetting is TColorSettingSimple then
+        SettingControl := TColorSettingControlSimple.Create(sbColors, TColorSettingSimple(ColorSetting))
+      else if MMFLauncher.DefaultColors.ContainsKey(ColorSetting.ID) then
+        SettingControl := TColorSettingControlResource.Create(sbColors, TColorSettingResource(ColorSetting), MMFLauncher.DefaultColors[ColorSetting.ID])
+      else
+        SettingControl := TColorSettingControlResource.Create(sbColors, TColorSettingResource(ColorSetting));
+
+      SettingControl.Align := alTop;
+      SettingControl.Visible := True;
+      SettingControl.Height := 10;
+      SettingControl.AutoSize := True;
+      SettingControl.Parent := sbColors;
+
+      if i < FSettings.ColorSettings.Count - 1 then
+        SettingControl.BorderSpacing.Bottom := 4;
+    end;
+  finally
+    MMFLauncher.Free;
   end;
 end;
 
@@ -173,7 +221,7 @@ var
   Res: TStartProcessRes;
   MMFLauncher: TMMFLauncher;
   SaveSettings: TSettings;
-  ColorSetting, SaveColorSetting: TColorSetting;
+  ColorSetting, SaveColorSetting: TColorSettingBase;
 begin
   SaveSettings := TSettings.Create(TPaths.SettingsPath);
   try
@@ -182,7 +230,12 @@ begin
         if ColorSetting.ID = SaveColorSetting.ID then
         begin
           SaveColorSetting.ColorCustom := ColorSetting.ColorCustom;
-          SaveColorSetting.ColorType := ColorSetting.ColorType;
+
+          if (ColorSetting is TColorSettingResource) and (SaveColorSetting is TColorSettingResource) then
+            TColorSettingResource(SaveColorSetting).ColorType := TColorSettingResource(ColorSetting).ColorType
+          else
+            TColorSettingSimple(SaveColorSetting).ColorType := TColorSettingSimple(ColorSetting).ColorType;
+
           Break;
         end;
 
@@ -190,6 +243,8 @@ begin
     SaveSettings.ShowUnreadMessagesBadge := chkShowUnreadMessagesBadge.Checked;
     SaveSettings.UsePreRenderedOverlays := chkUsePreRenderedOverlays.Checked;
     SaveSettings.ExcludeUnreadMessagesMutedChats := chkExcludeUnreadMessagesMutedChats.Checked;
+    SaveSettings.RemoveRoundedElementCorners := chkRemoveRoundedElementCorners.Checked;
+    SaveSettings.UseRegularTitleBar := chkUseRegularTitleBar.Checked;
     SaveSettings.HideMaximize := chkHideMaximize.Checked;
     SaveSettings.SuppressPresenceAvailable := chkSuppressPresenceAvailable.Checked;
     SaveSettings.SuppressPresenceComposing := chkSuppressPresenceComposing.Checked;
@@ -257,20 +312,18 @@ begin
   end;
 end;
 
-{ TColorSettingControl }
+{ TColorSettingControlBase }
 
-constructor TColorSettingControl.Create(const AOwner: TComponent; const ColorSetting: TColorSetting);
+constructor TColorSettingControlBase.Create(const AOwner: TComponent; const ColorSetting: TColorSettingBase);
 var
   RightContainer: TPanel;
 begin
   inherited Create(AOwner);
 
-  FColorSetting := ColorSetting;
-
   FLabelDescription := TLabel.Create(Self);
   FLabelDescription.Align := alLeft;
   FLabelDescription.AutoSize := True;
-  FLabelDescription.Caption := FColorSetting.Description;
+  FLabelDescription.Caption := ColorSetting.Description;
   FLabelDescription.Layout := tlCenter;
   FLabelDescription.Parent := Self;
 
@@ -299,32 +352,21 @@ begin
   FPanelColor.ParentBackground := False;
   FPanelColor.Parent := FPanelColorContainer;
 
-  if (not OsSupportsImmersiveColors) and (FColorSetting.ColorType = ctImmersive) then
-    FColorSetting.ColorType := ctNone;
-
-  if (FColorSetting.ColorDefault = clNone) and (FColorSetting.ColorType = ctNone) then
-    if OsSupportsImmersiveColors then
-      FColorSetting.ColorType := ctImmersive
-    else
-      FColorSetting.ColorType := ctCustom;
-
-  ConfigureComboBox;
-
   FComboColorType.OnSelect := ComboReplaceTypeSelect;
-
   FPanelColor.OnClick := PanelColorClick;
 
+  ConfigureComboBox;
   UpdateColor;
 end;
 
-procedure TColorSettingControl.SetParent(AParent: TWinControl);
+procedure TColorSettingControlBase.SetParent(AParent: TWinControl);
 begin
   inherited;
 
   FPanelColorContainer.Width := FComboColorType.Height;
 end;
 
-procedure TColorSettingControl.DoOnResize;
+procedure TColorSettingControlBase.DoOnResize;
 begin
   inherited DoOnResize;
 
@@ -332,18 +374,36 @@ begin
     FPanelColor.Parent.Width := Height;
 end;
 
-procedure TColorSettingControl.UpdateColor;
+procedure TColorSettingControlBase.ComboReplaceTypeSelect(Sender: TObject);
+begin
+  UpdateColor;
+end;
+
+{ TColorSettingControlSimple }
+
+constructor TColorSettingControlSimple.Create(const AOwner: TComponent; const ColorSetting: TColorSettingSimple);
+begin
+  FColorSetting := ColorSetting;
+
+  if FColorSetting.ColorCustom = 0 then
+    FColorSetting.ColorCustom := FColorSetting.GetColor(caNone);
+
+  inherited Create(AOwner, ColorSetting);
+end;
+
+procedure TColorSettingControlSimple.UpdateColor;
 begin
   FPanelColor.Color := FColorSetting.GetColor(caNone);
 end;
 
-procedure TColorSettingControl.ComboReplaceTypeSelect(Sender: TObject);
+procedure TColorSettingControlSimple.ComboReplaceTypeSelect(Sender: TObject);
 begin
-  FColorSetting.ColorType := TColorType(FComboColorType.ItemsEx[FComboColorType.ItemIndex].Data);
-  UpdateColor;
+  FColorSetting.ColorType := TColorTypeSimple(FComboColorType.ItemsEx[FComboColorType.ItemIndex].Data);
+
+  inherited ComboReplaceTypeSelect(Sender);
 end;
 
-procedure TColorSettingControl.PanelColorClick(Sender: TObject);
+procedure TColorSettingControlSimple.PanelColorClick(Sender: TObject);
 var
   Dlg: TColorDialog;
 begin
@@ -355,9 +415,9 @@ begin
     begin
       TPanel(Sender).Color := Dlg.Color;
 
-      FComboColorType.ItemIndex := 2;
+      FComboColorType.ItemIndex := IfThen<Integer>(OsSupportsImmersiveColors, 1, 0);
 
-      FColorSetting.ColorType := ctCustom;
+      FColorSetting.ColorType := ctsCustom;
       FColorSetting.ColorCustom := Dlg.Color;
     end;
   finally
@@ -365,15 +425,102 @@ begin
   end;
 end;
 
-procedure TColorSettingControl.ConfigureComboBox;
+procedure TColorSettingControlSimple.ConfigureComboBox;
 var
   i: Integer;
 begin
-  if FColorSetting.ClassType = TResourceColorSetting then
-    FComboColorType.ItemsEx.AddItem('Use default', -1, -1, -1, -1, Pointer(ctNone));
   if OsSupportsImmersiveColors then
-    FComboColorType.ItemsEx.AddItem('Use windows color', -1, -1, -1, -1, Pointer(ctImmersive));
-  FComboColorType.ItemsEx.AddItem('Use custom color', -1, -1, -1, -1, Pointer(ctCustom));
+    FComboColorType.ItemsEx.AddItem('Use windows color', -1, -1, -1, -1, Pointer(ctsImmersive));
+  FComboColorType.ItemsEx.AddItem('Use custom color', -1, -1, -1, -1, Pointer(ctsCustom));
+
+  for i := 0 to FComboColorType.ItemsEx.Count - 1 do
+    if FComboColorType.ItemsEx[i].Data = Pointer(FColorSetting.ColorType) then
+    begin
+      FComboColorType.ItemIndex := i;
+      Break;
+    end;
+
+  if FComboColorType.ItemIndex = -1 then
+    FComboColorType.ItemIndex := 0;
+end;
+
+{ TColorSettingControlResource }
+
+constructor TColorSettingControlResource.Create(const AOwner: TComponent; const ColorSetting: TColorSettingResource; DefaultColor: TColor);
+begin
+  FColorSetting := ColorSetting;
+  FDefaultColor := DefaultColor;
+  FColorAvailable := True;
+
+  if FColorSetting.ColorCustom = 0 then
+    FColorSetting.ColorCustom := DefaultColor;
+
+  inherited Create(AOwner, ColorSetting);
+end;
+
+constructor TColorSettingControlResource.Create(const AOwner: TComponent; const ColorSetting: TColorSettingResource);
+begin
+  FColorSetting := ColorSetting;
+
+  inherited Create(AOwner, ColorSetting);
+
+  Enabled := False;
+end;
+
+procedure TColorSettingControlResource.UpdateColor;
+begin
+  if not FColorAvailable then
+  begin
+    FPanelColor.Color := clWindow;
+    Exit;
+  end;
+
+  FPanelColor.Color := FColorSetting.GetColor(caNone, FDefaultColor);
+end;
+
+procedure TColorSettingControlResource.ComboReplaceTypeSelect(Sender: TObject);
+begin
+  FColorSetting.ColorType := TColorTypeResource(FComboColorType.ItemsEx[FComboColorType.ItemIndex].Data);
+
+  inherited ComboReplaceTypeSelect(Sender);
+end;
+
+procedure TColorSettingControlResource.PanelColorClick(Sender: TObject);
+var
+  Dlg: TColorDialog;
+begin
+  if not FColorAvailable then
+    Exit;
+
+  Dlg := TColorDialog.Create(Self);
+  try
+    Dlg.Color := FColorSetting.GetColor(caNone, FDefaultColor);
+
+    if Dlg.Execute then
+    begin
+      TPanel(Sender).Color := Dlg.Color;
+
+      FComboColorType.ItemIndex := IfThen<Integer>(OsSupportsImmersiveColors, 2, 1);
+
+      FColorSetting.ColorType := ctrCustom;
+      FColorSetting.ColorCustom := Dlg.Color;
+    end;
+  finally
+    Dlg.Free;
+  end;
+end;
+
+procedure TColorSettingControlResource.ConfigureComboBox;
+var
+  i: Integer;
+begin
+  if not FColorAvailable then
+    Exit;
+
+  FComboColorType.ItemsEx.AddItem('Use default', -1, -1, -1, -1, Pointer(ctrOriginal));
+  if OsSupportsImmersiveColors then
+    FComboColorType.ItemsEx.AddItem('Use windows color', -1, -1, -1, -1, Pointer(ctrImmersive));
+  FComboColorType.ItemsEx.AddItem('Use custom color', -1, -1, -1, -1, Pointer(ctrCustom));
 
   for i := 0 to FComboColorType.ItemsEx.Count - 1 do
     if FComboColorType.ItemsEx[i].Data = Pointer(FColorSetting.ColorType) then
