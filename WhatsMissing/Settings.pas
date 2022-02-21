@@ -332,17 +332,17 @@ begin
 
   FNotificationIconBadgeTextColor := TColorSettingSimple.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted);
 
-  FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter')]));
+  FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter').UpdateInFile('svg.*.js')]));
 
   FColorSettings.Add(FNotificationIconBadgeColor);
 
   FColorSettings.Add(FNotificationIconBadgeTextColor);
 
-  FColorSettings.Add(TColorSettingResource.Create(18, 'Application startup', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--startup-background'),
+  FColorSettings.Add(TColorSettingResource.Create(18, 'Startup background', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--startup-background'),
     TColorSettingResourcePatch.Create('--startup-background-rgb').RGB,
     TColorSettingResourcePatch.Create('--startup-icon')]));
 
-  FColorSettings.Add(TColorSettingResource.Create(19, 'Intro', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--intro-background'), TColorSettingResourcePatch.Create('--intro-border').Darken10]));
+  FColorSettings.Add(TColorSettingResource.Create(19, 'Intro background', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--intro-background'), TColorSettingResourcePatch.Create('--intro-border').Darken10]));
 
   FColorSettings.Add(TColorSettingResource.Create(20, 'Panel background', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--panel-header-background'),
     TColorSettingResourcePatch.Create('--panel-input-background'), TColorSettingResourcePatch.Create('--search-input-container-background'),
@@ -352,16 +352,16 @@ begin
     TColorSettingResourcePatch.Create('--teal'), TColorSettingResourcePatch.Create('--app-background-stripe'),
     TColorSettingResourcePatch.Create('--checkbox-background').Lighten3, TColorSettingResourcePatch.Create('--panel-background-colored').Lighten3.UpdateAllColors]));
 
-  FColorSettings.Add(TColorSettingResource.Create(22, 'Chat list', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--background-default')]));
-  FColorSettings.Add(TColorSettingResource.Create(23, 'Chat list (hovered)', ImmersiveLightEntityItemBackgroundHover, [TColorSettingResourcePatch.Create('--background-default-hover')]));
-  FColorSettings.Add(TColorSettingResource.Create(24, 'Chat list (focused)', ImmersiveLightHoverBackground, [TColorSettingResourcePatch.Create('--background-default-active')]));
+  FColorSettings.Add(TColorSettingResource.Create(22, 'Chat list background', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--background-default')]));
+  FColorSettings.Add(TColorSettingResource.Create(23, 'Chat list background (hovered)', ImmersiveLightEntityItemBackgroundHover, [TColorSettingResourcePatch.Create('--background-default-hover')]));
+  FColorSettings.Add(TColorSettingResource.Create(24, 'Chat list background (focused)', ImmersiveLightEntityItemBackgroundSelected, [TColorSettingResourcePatch.Create('--background-default-active')]));
 
   FColorSettings.Add(TColorSettingResource.Create(3, 'Progressbar', ImmersiveControlLightProgressForeground, [TColorSettingResourcePatch.Create('--progress-primary')]));
 
   FColorSettings.Add(TColorSettingResource.Create(25, 'Input background', ImmersiveControlContextMenuBackgroundRest, [TColorSettingResourcePatch.Create('--search-input-background'),
     TColorSettingResourcePatch.Create('--compose-input-background')]));
 
-  FColorSettings.Add(TColorSettingResource.Create(26, 'Icons', ImmersiveSystemAccentLight2, [TColorSettingResourcePatch.Create('--button-round-icon-inverted').UpdateInFile('svg.*.js'),
+  FColorSettings.Add(TColorSettingResource.Create(26, 'Icons', ImmersiveControlDefaultLightButtonBackgroundRest, [TColorSettingResourcePatch.Create('--button-round-icon-inverted').UpdateInFile('svg.*.js'),
     TColorSettingResourcePatch.Create('--icon'), TColorSettingResourcePatch.Create('--panel-header-icon'), TColorSettingResourcePatch.Create('--icon-search-back')]));
 
   FColorSettings.Add(TColorSettingResource.Create(11, 'New voice mail icon', ImmersiveLightWUError, [TColorSettingResourcePatch.Create('--ptt-green').UpdateInFile('svg.*.js')]));

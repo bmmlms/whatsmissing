@@ -46,5 +46,6 @@ To use the build script "Build.bat" you need to configure variables at the top o
 - [Free Pascal](https://www.freepascal.org)
 - [Font Awesome](https://fontawesome.com) for application icon
 - [Yusuke Kamiyamane](https://p.yusukekamiyamane.com/about) for Fugue Icons
+- [FatCow Web Hosting](https://www.fatcow.com/free-icons) for icons
 - [MahdiSafsafi](https://github.com/MahdiSafsafi) for DDetours and ImmersiveColors
 - [Alex Ionescu](https://github.com/ionescu007) for minlzma

@@ -69,7 +69,7 @@
           </Linking>
           <Other>
             <CompilerMessages>
-              <IgnoredMessages idx6058="True" idx4104="True"/>
+              <IgnoredMessages idx6058="True" idx5071="True" idx5062="True" idx4104="True" idx4046="True"/>
             </CompilerMessages>
           </Other>
         </CompilerOptions>
@@ -187,7 +187,7 @@
     </Linking>
     <Other>
       <CompilerMessages>
-        <IgnoredMessages idx6058="True" idx4104="True"/>
+        <IgnoredMessages idx6058="True" idx5071="True" idx5062="True" idx4104="True" idx4046="True"/>
       </CompilerMessages>
     </Other>
   </CompilerOptions>

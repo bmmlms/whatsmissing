@@ -272,7 +272,7 @@ var
   InjectorPath: string;
   LibraryPath: UnicodeString;
   ExitCode: DWORD = 0;
-  Written: DWORD;
+  Written: DWORD = 0;
   Res: TStartProcessRes;
 begin
   Result := False;

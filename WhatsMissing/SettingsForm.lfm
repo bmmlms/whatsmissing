@@ -1,16 +1,16 @@
 object frmSettings: TfrmSettings
   Left = 0
-  Height = 362
+  Height = 400
   Top = 0
-  Width = 401
+  Width = 420
   BorderIcons = [biSystemMenu]
   BorderStyle = bsSingle
   Caption = 'Settings'
   ChildSizing.LeftRightSpacing = 4
   ChildSizing.TopBottomSpacing = 4
   ChildSizing.VerticalSpacing = 4
-  ClientHeight = 362
-  ClientWidth = 401
+  ClientHeight = 400
+  ClientWidth = 420
   Color = clBtnFace
   Font.Color = clWindowText
   Font.Height = -11
@@ -20,19 +20,18 @@ object frmSettings: TfrmSettings
   OnKeyDown = FormKeyDown
   OnShow = FormShow
   Position = poScreenCenter
-  LCLVersion = '2.2.0.4'
   object pnlSave: TPanel
     Left = 4
     Height = 32
-    Top = 326
-    Width = 393
+    Top = 364
+    Width = 412
     Align = alBottom
     BevelOuter = bvNone
     ClientHeight = 32
-    ClientWidth = 393
+    ClientWidth = 412
     TabOrder = 0
     object btnSave: TBitBtn
-      Left = 288
+      Left = 307
       Height = 32
       Top = 0
       Width = 105
@@ -41,15 +40,17 @@ object frmSettings: TfrmSettings
       Default = True
       Kind = bkOK
       ModalResult = 1
+      Images = ImageList
+      ImageIndex = 0
       OnClick = btnSaveClick
       TabOrder = 0
     end
   end
   object PageControl1: TPageControl
     Left = 4
-    Height = 310
+    Height = 348
     Top = 4
-    Width = 393
+    Width = 412
     ActivePage = tbsSettings
     Align = alClient
     TabIndex = 0
@@ -59,13 +60,13 @@ object frmSettings: TfrmSettings
       ChildSizing.LeftRightSpacing = 4
       ChildSizing.TopBottomSpacing = 4
       ChildSizing.VerticalSpacing = 2
-      ClientHeight = 284
-      ClientWidth = 385
+      ClientHeight = 322
+      ClientWidth = 404
       object chkShowNotificationIcon: TCheckBox
         Left = 4
         Height = 19
         Top = 4
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Show notification icon'
         OnChange = CheckBoxChange
@@ -75,7 +76,7 @@ object frmSettings: TfrmSettings
         Left = 4
         Height = 19
         Top = 130
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Hide/disable maximize button'
         TabOrder = 1
@@ -84,7 +85,7 @@ object frmSettings: TfrmSettings
         Left = 4
         Height = 19
         Top = 151
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Suppress outbound online notifications'
         TabOrder = 2
@@ -93,7 +94,7 @@ object frmSettings: TfrmSettings
         Left = 4
         Height = 19
         Top = 172
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Suppress outbound typing notifications'
         TabOrder = 3
@@ -102,7 +103,7 @@ object frmSettings: TfrmSettings
         Left = 4
         Height = 19
         Top = 193
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Suppress consecutive notification sounds'
         TabOrder = 4
@@ -111,7 +112,7 @@ object frmSettings: TfrmSettings
         Left = 4
         Height = 19
         Top = 25
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Show unread messages badge'
         OnChange = CheckBoxChange
@@ -121,7 +122,7 @@ object frmSettings: TfrmSettings
         Left = 4
         Height = 19
         Top = 67
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Exclude unread messages of muted chats'
         TabOrder = 6
@@ -130,7 +131,7 @@ object frmSettings: TfrmSettings
         Left = 4
         Height = 19
         Top = 46
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Use pre-rendered overlays for messages badge'
         OnChange = CheckBoxChange
@@ -140,7 +141,7 @@ object frmSettings: TfrmSettings
         Left = 4
         Height = 19
         Top = 88
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Use regular title bar/window border'
         TabOrder = 8
@@ -149,7 +150,7 @@ object frmSettings: TfrmSettings
         Left = 4
         Height = 19
         Top = 109
-        Width = 377
+        Width = 396
         Align = alTop
         Caption = 'Remove rounded element corners'
         TabOrder = 9
@@ -157,13 +158,13 @@ object frmSettings: TfrmSettings
     end
     object tbsColors: TTabSheet
       Caption = 'Colors'
-      ClientHeight = 284
-      ClientWidth = 385
+      ClientHeight = 322
+      ClientWidth = 404
       object sbColors: TScrollBox
         Left = 0
-        Height = 284
+        Height = 322
         Top = 0
-        Width = 385
+        Width = 404
         HorzScrollBar.Page = 1
         HorzScrollBar.Visible = False
         VertScrollBar.Increment = 1
@@ -181,9 +182,33 @@ object frmSettings: TfrmSettings
   object Bevel1: TBevel
     Left = 4
     Height = 4
-    Top = 318
-    Width = 393
+    Top = 356
+    Width = 412
     Align = alBottom
     Shape = bsTopLine
+  end
+  object ImageList: TImageList
+    Left = 108
+    Top = 276
+    Bitmap = {
+      4C7A010000001000000010000000210200000000000078DAA5934F48937118C7
+      9FD96D87920E51170F82A7A090F7D4599DD319392368115E3A54F732851D8219
+      CBF9AADBDAD61F175804C1E6A043EBA219E236F7AAE1A64C212A0A22E8E425C8
+      DBB7EFEF7DA7DB3BD7A9071EDEDF9FE7F33CCFFB7D9F1780E03FDD667ABF2613
+      AE05097643825D309F132EC864DF824C0D68F5A147F8903B7E3CE1C39DCA3BCC
+      FDFE8ED8DE67F87F6E6078278B73D9208E458620FA40AA291F72A7CE246F6011
+      7F30FCC380E49F41561290DC6373DDBEF612E7971368797405EC236EE3758FE6
+      8C5D4566FF174E975E9389430AE40A4F20AB5557FB7C0227B30F20338390E98B
+      DA21FFD0B5E4335EA1EFEB2263639022630D32C653EBA9CE56A6A14CDE872073
+      37A987E7431D8F916F05C83A63F361D68A30077B3098A7A8581D0726AB5148FA
+      2E75F0A0C6F7E0D69725C6476A71059D2CF3E427516FB2414D32A3ACDF5FE3F9
+      7D86B6DEF02E6A8FCD8DDBF7C5294889BA66C6EC7CC88D0BB9E79032FB5FD7D1
+      CC648DFD6CB2F6D62C1CE9117BFF811EE3547A14AD06EFB7F9CE1FF5869EC996
+      A94785ECB20EC78BDB90F15EE390F7757A25ECC589B701E6670F157A993A6D52
+      CB1235D866DE9D59B33FB37698DFEF5AA7B76E7E9CE2EF4A09E7AB65FE9EA9B7
+      EC32FE53D2F2DD241C3C33D9E86588BF5BCDA0B3617EDBE43EE79EB9557F2AD6
+      313F66B95AAB9E555D8B6D6B3AFF22ED72E9EC7509F41A4A1FA5B1E96AADCED4
+      5D95FD076FBD8B48075D6BF08EEA9DEDFFFB0B9B32252A
+    }
   end
 end

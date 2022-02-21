@@ -89,6 +89,7 @@ type
     chkHideMaximize: TCheckBox;
     chkShowNotificationIcon: TCheckBox;
     chkRemoveRoundedElementCorners: TCheckBox;
+    ImageList: TImageList;
     PageControl1: TPageControl;
     pnlSave: TPanel;
     sbColors: TScrollBox;

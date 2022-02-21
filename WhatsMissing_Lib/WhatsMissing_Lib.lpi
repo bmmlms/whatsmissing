@@ -61,6 +61,11 @@
               <ExecutableType Value="Library"/>
             </Options>
           </Linking>
+          <Other>
+            <CompilerMessages>
+              <IgnoredMessages idx6058="True" idx5071="True" idx5062="True" idx4104="True" idx4046="True"/>
+            </CompilerMessages>
+          </Other>
         </CompilerOptions>
       </Item2>
     </BuildModes>
@@ -160,6 +165,11 @@
         <ExecutableType Value="Library"/>
       </Options>
     </Linking>
+    <Other>
+      <CompilerMessages>
+        <IgnoredMessages idx6058="True" idx5071="True" idx5062="True" idx4104="True" idx4046="True"/>
+      </CompilerMessages>
+    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="3">
