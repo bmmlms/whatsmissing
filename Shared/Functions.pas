@@ -209,7 +209,7 @@ var
 begin
   SetLength(Buf, MAX_PATH + 1);
   SetLength(Buf, GetTempPathW(Length(Buf), PWideChar(Buf)));
-  Result := Buf;
+  Result := PWideChar(Buf);
 end;
 
 class function TFunctions.HTMLToColor(const Color: string): TColor;

@@ -420,7 +420,7 @@ var
   JSONData: TJSONData;
   JSONEnum: TJSONEnum;
   Chat: TChat;
-  WhatsAppData: TWhatsAppData;
+  WhatsAppData: TWhatsAppData = (MessageType: ''; MessageSubType: ''; DataType: ''; DataSubType: '');
   JSON: TMemoryStream;
 begin
   if hFile = FWACommunicationHandle then

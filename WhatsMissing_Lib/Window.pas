@@ -7,6 +7,7 @@ uses
   Constants,
   Functions,
   Log,
+  Math,
   MMF,
   NotificationOverlays,
   Paths,
@@ -642,46 +643,45 @@ type
     end;
   end;
 
-  function ColorizeGray(const BitmapStart, BitmapEnd: Pointer; const Color, TextColor: TColor): TByteArray;
-  type
-    TGATup = record
-    Gray: Byte;
-    Alpha: Byte;
-  end;
-    PGATup = ^TGATup;
+  function BuildImage(const BitmapStart, BitmapEnd: Pointer; const Width, Height: Integer; const BackgroundColor, TextColor: TColor; const BackgroundLightness, TextLightness: LongInt): TByteArray;  // TODO: warum longint?!
   var
-    HB, SB, HF, SF, L: Byte;
-    GATup: PGATup;
+    HB, LB, SB, HF, LF, SF, L: Byte;
+    PixelData: PPixelData;
     RGBQuad: PRGBQUAD;
   begin
-    SetLength(Result, (BitmapEnd - BitmapStart) * SizeOf(TGATup));
+    SetLength(Result, Width * Height * SizeOf(TRGBQUAD));
 
-    ColorToHLS(Color, HB, L, SB);
-    ColorToHLS(TextColor, HF, L, SF);
+    ColorToHLS(BackgroundColor, HB, LB, SB);
+    ColorToHLS(TextColor, HF, LF, SF);
 
-    GATup := BitmapStart;
+    PixelData := BitmapStart;
     RGBQuad := @Result[0];
-    while GATup < BitmapEnd do
+    while PixelData < BitmapEnd do
     begin
-      if GATup.Gray > $C0 then
-        HLStoRGB(HF, GATup.Gray, SF, RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue)
-      else
-        HLStoRGB(HB, GATup.Gray, SB, RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue);
+      if PixelData^.IsBackground = $01 then
+      begin
+        L := Math.Min(255, Math.Max(0, LB + (PixelData^.Lightness - BackgroundLightness)));
+        HLStoRGB(HB, L, SB, RGBQuad^.rgbRed, RGBQuad^.rgbGreen, RGBQuad^.rgbBlue);
+      end else
+      begin
+        L := Math.Min(255, Math.Max(0, LF + (PixelData^.Lightness - TextLightness)));
+        HLStoRGB(HF, L, SF, RGBQuad^.rgbRed, RGBQuad^.rgbGreen, RGBQuad^.rgbBlue);
+      end;
 
-      RGBQuad.rgbReserved := GATup.Alpha;
+      RGBQuad^.rgbReserved := PixelData.Alpha;
 
-      GATup := PGATup(NativeUInt(GATup) + SizeOf(TGATup));
+      PixelData := PPixelData(NativeUInt(PixelData) + SizeOf(TPixelData));
       RGBQuad := PRGBQUAD(NativeUInt(RGBQuad) + SizeOf(TRGBQUAD));
     end;
   end;
 
 var
-  DC, Bmp, Icon: Handle;
+  DC, Bmp, Icon: HANDLE;
   BitmapStart: Pointer = nil;
   IconInfo: TIconInfo = (fIcon: False; xHotspot: 0; yHotspot: 0; hbmMask: 0; hbmColor: 0);
   BitmapHeader: BITMAPV5HEADER;
   BitmapInfo: BITMAP;
-  NOI: TNotificationOverlayInfo;
+  NOI: PNotificationOverlayInfo;
   NotificationBitmap: TByteArray;
 begin
   if ExtractIconExW(PWideChar(UnicodeString(TPaths.ExePath)), 0, nil, @Icon, 1) <> 1 then
@@ -709,8 +709,11 @@ begin
   DrawIconEx(DC, 0, 0, Icon, BitmapInfo.bmWidth, BitmapInfo.bmHeight, 0, 0, DI_NORMAL);
 
   NOI := GetNotificationOverlay(UnreadCount);
-  NotificationBitmap := ColorizeGray(NOI.Data, Pointer(NativeUInt(NOI.Data) + (NOI.Width * NOI.Height * 2)), BackgroundColor, TextColor);
-  Draw(BitmapStart, @NotificationBitmap[0], BitmapInfo.bmWidth - NOI.Width, BitmapInfo.bmHeight - NOI.Height, BitmapInfo.bmWidth, NOI.Width, NOI.Height);
+  if Assigned(NOI) then
+  begin
+    NotificationBitmap := BuildImage(NOI^.Data, Pointer(NativeUInt(NOI^.Data) + (NOI^.Width * NOI^.Height * SizeOf(TPixelData))), NOI^.Width, NOI^.Height, BackgroundColor, TextColor, NOI^.BackgroundLightness, NOI^.TextLightness);
+    Draw(BitmapStart, @NotificationBitmap[0], BitmapInfo.bmWidth - NOI^.Width, BitmapInfo.bmHeight - NOI^.Height, BitmapInfo.bmWidth, NOI^.Width, NOI^.Height);
+  end;
 
   IconInfo.fIcon := True;
   IconInfo.xHotspot := 0;
@@ -807,7 +810,7 @@ type
   function GetTextDrawInfo(const FontSize: Integer; const Text: string; var TextDrawInfo: TTextDrawInfo): Boolean;
   var
     R: RECT;
-    DC, Bmp, Brush, Font, FontOld: Handle;
+    DC, Bmp, Brush, Font, FontOld: HANDLE;
     BitmapHeader: BITMAPV5HEADER;
     FHeight, X, Y: LongInt;
     BitmapSize: TSize;
@@ -881,7 +884,7 @@ type
   var
     FontOld: HFONT;
     R: TRect;
-    DC, Bmp, Pen, PenOld, Brush, BrushOld: Handle;
+    DC, Bmp, Pen, PenOld, Brush, BrushOld: HANDLE;
     BitmapStart: PRGBQUAD = nil;
     BitmapHeader: BITMAPV5HEADER;
   begin
@@ -935,7 +938,7 @@ const
   BoxPaddingX = 1;
   BoxPaddingY = 1;
 var
-  DC, Bmp, Icon: Handle;
+  DC, Bmp, Icon: HANDLE;
   Text: string;
   BitmapStart: PRGBQUAD = nil;
   BitmapHeader: BITMAPV5HEADER;

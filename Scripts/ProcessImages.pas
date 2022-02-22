@@ -25,12 +25,16 @@ end;
 
 function ProcessImage(const InFile, VarName: string; const Rect: TRect): string;
 var
-  Idx: Integer;
+  Idx: Integer = 0;
   P: TPicture;
   B: Graphics.TBitmap;
   Values: array of string;
   RGBQuad: PRGBQUAD;
   H, L, S: Byte;
+  BackgroundPixelCount: Integer = 0;
+  TextPixelCount: Integer = 0;
+  BackgroundLightness: Integer = 0;
+  TextLightness: Integer = 0;
 begin
   P := TPicture.Create;
   B := Graphics.TBitmap.Create;
@@ -45,22 +49,40 @@ begin
 
     B.Canvas.CopyRect(TRect.Create(0, 0, Rect.Width, Rect.Height), P.Bitmap.Canvas, Rect);
 
-    SetLength(Values, Rect.Width * Rect.Height * 2);
+    SetLength(Values, Rect.Width * Rect.Height * 3);
 
     RGBQuad := PRGBQUAD(B.RawImage.Data);
 
     while RGBQuad < Pointer(B.RawImage.Data) + (B.Width * B.Height * SizeOf(TRGBQUAD)) do
     begin
-      RGBtoHLS(RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue, H, L, S);
+      RGBtoHLS(RGBQuad^.rgbRed, RGBQuad^.rgbGreen, RGBQuad^.rgbBlue, H, L, S);
 
-      Idx := (NativeUInt(RGBQuad) - NativeUInt(B.RawImage.Data)) div 2;
-      Values[Idx] := '$' + HexStr(ColorToGray(HLStoColor(H, L, S)), 2);
-      Values[Idx + 1] := '$' + HexStr(RGBQuad.rgbReserved, 2);
+      if (RGBQuad^.rgbGreen <= 130) then
+      begin
+        Values[Idx] := '$01';
+
+        Inc(BackgroundPixelCount);
+        Inc(BackgroundLightness, L);
+      end else
+      begin
+        Values[Idx] := '$00';
+
+        Inc(TextPixelCount);
+        Inc(TextLightness, L);
+      end;
+
+      Values[Idx + 1] := '$' + HexStr(L, 2);
+      Values[Idx + 2] := '$' + HexStr(RGBQuad^.rgbReserved, 2);
 
       RGBQuad := PRGBQUAD(NativeUInt(RGBQuad) + SizeOf(TRGBQUAD));
+
+      Inc(Idx, 3);
     end;
 
-    Result := '  %sD: array[0..%d] of Byte = (%s);'#13#10'  %s: TNotificationOverlayInfo = (Width: %d; Height: %d; Data: @%sD);'.Format([VarName, Length(Values) - 1, string.Join(', ', Values), VarName, Rect.Width, Rect.Height, VarName]);
+    BackgroundLightness := BackgroundLightness div BackgroundPixelCount;
+    TextLightness := TextLightness div TextPixelCount; 
+
+    Result := '  %sD: array[0..%d] of Byte = (%s);'#13#10'  %s: TNotificationOverlayInfo = (Width: %d; Height: %d; BackgroundLightness: %d; TextLightness: %d; Data: @%sD);'.Format([VarName, Length(Values) - 1, string.Join(', ', Values), VarName, Rect.Width, Rect.Height, BackgroundLightness, TextLightness, VarName]);
   finally
     P.Free;
     B.Free;
@@ -87,13 +109,9 @@ begin
   try
     FileList.Sort;
 
-    Consts += '  DummyD: array[0..1] of Byte = ($00, $00);'#13#10'  Dummy: TNotificationOverlayInfo = (Width: 1; Height: 1; Data: @DummyD);'#13#10;
-
     for F in FileList do
     begin
       WriteLn('Processing "%s"...'.Format([F]));
-
-      R := TRect.Create(3, 3, 3 + 9, 3 + 9);
 
       VarIdx := FileList.IndexOf(F) + 1;
 
@@ -108,12 +126,12 @@ begin
       Consts += '%s'#13#10.Format([ProcessImage(F, VarName, R)]);
 
       if VarIdx < FileList.Count then
-        SwitchFunc += '  if Value = %d then'#13#10'    Exit(%s);'#13#10.Format([VarIdx, VarName])
+        SwitchFunc += '  if Value = %d then'#13#10'    Exit(@%s);'#13#10.Format([VarIdx, VarName])
       else
-        SwitchFunc += '  if Value >= %d then'#13#10'    Exit(%s);'#13#10.Format([VarIdx, VarName]);
+        SwitchFunc += '  if Value >= %d then'#13#10'    Exit(@%s);'#13#10.Format([VarIdx, VarName]);
     end;
 
-    Res := 'unit NotificationOverlays;'#13#10#13#10'interface'#13#10#13#10'type'#13#10'  TNotificationOverlayInfo = record'#13#10'    Width, Height: Longint;'#13#10'    Data: PByte;'#13#10'  end;'#13#10#13#10'function GetNotificationOverlay(Value: Integer): TNotificationOverlayInfo;'#13#10#13#10'implementation'#13#10#13#10'const'#13#10'%s'#13#10#13#10'function GetNotificationOverlay(Value: Integer): TNotificationOverlayInfo;'#13#10'begin'#13#10'  Result := Dummy;'#13#10'%s'#13#10'end;'#13#10#13#10'end.'.Format([Consts.TrimRight, SwitchFunc.TrimRight]);
+    Res := 'unit NotificationOverlays;'#13#10#13#10'interface'#13#10#13#10'type'#13#10'  TPixelData = record'#13#10'    IsBackground, Lightness, Alpha: Byte;'#13#10'  end;'#13#10'  PPixelData = ^TPixelData;'#13#10#13#10'  TNotificationOverlayInfo = record'#13#10'    Width, Height, BackgroundLightness, TextLightness: Longint;'#13#10'    Data: PPixelData;'#13#10'  end;'#13#10'  PNotificationOverlayInfo = ^TNotificationOverlayInfo;'#13#10#13#10'function GetNotificationOverlay(Value: Integer): PNotificationOverlayInfo;'#13#10#13#10'implementation'#13#10#13#10'const'#13#10'%s'#13#10#13#10'function GetNotificationOverlay(Value: Integer): PNotificationOverlayInfo;'#13#10'begin'#13#10'  Result := nil;'#13#10'%s'#13#10'end;'#13#10#13#10'end.'.Format([Consts.TrimRight, SwitchFunc.TrimRight]);
 
     OutFile := TFileStream.Create(ParamStr(2), fmCreate);
     try
