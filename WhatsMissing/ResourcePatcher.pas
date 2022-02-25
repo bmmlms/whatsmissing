@@ -501,8 +501,6 @@ begin
     FContentOffset := Asar.Header.ContentOffset;
 
     Asar.Header.Write(FJSON);
-
-    asar.Write('e:\tmp.asar');
   finally
     Asar.Free;
 
