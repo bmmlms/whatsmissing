@@ -90,7 +90,7 @@ type
     procedure Clear; override;
 
     function Get(const JID: string): TChat;
-    procedure GetUnreadChats(const MaxAgeDays: Integer; const MaxToolTipLen: Integer; const ExcludeMuted: Boolean; out Count: Integer; out ToolTip: string);
+    procedure GetUnreadChats(const MaxAgeDays: Integer; const MaxToolTipLen: Integer; const ExcludeMuted: Boolean; out ChatCount: Integer; out ToolTip: string);
 
     procedure ReadStream(const MS: TMemoryStream);
     procedure WriteStream(const MS: TMemoryStream);
@@ -118,7 +118,6 @@ type
     FExcludeUnreadMessagesMutedChats: Boolean;
     FNotificationIconBadgeColor: LongInt;
     FNotificationIconBadgeTextColor: LongInt;
-    fRemoveRoundedElementCorners: Boolean;
     FUseRegularTitleBar: Boolean;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
@@ -153,7 +152,6 @@ type
     property ExcludeUnreadMessagesMutedChats: Boolean read FExcludeUnreadMessagesMutedChats write FExcludeUnreadMessagesMutedChats;
     property NotificationIconBadgeColor: LongInt read FNotificationIconBadgeColor write FNotificationIconBadgeColor;
     property NotificationIconBadgeTextColor: LongInt read FNotificationIconBadgeTextColor write FNotificationIconBadgeTextColor;
-    property RemoveRoundedElementCorners: Boolean read FRemoveRoundedElementCorners write FRemoveRoundedElementCorners;
     property UseRegularTitleBar: Boolean read FUseRegularTitleBar write FUseRegularTitleBar;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
@@ -429,16 +427,17 @@ begin
   Result := CompareDWord(TChat(B).LastCommunication, TChat(A).LastCommunication, SizeOf(TChat(A).LastCommunication));
 end;
 
-procedure TChatList.GetUnreadChats(const MaxAgeDays: Integer; const MaxToolTipLen: Integer; const ExcludeMuted: Boolean; out Count: Integer; out ToolTip: string);
+procedure TChatList.GetUnreadChats(const MaxAgeDays: Integer; const MaxToolTipLen: Integer; const ExcludeMuted: Boolean; out ChatCount: Integer; out ToolTip: string);
 const
-  Tail = #13#10'  +%d messages';
+  Tail = #13#10'  +%d chat(s)';
 var
-  Processed: Integer;
+  MessageCount, ProcessedMessages, ProcessedChats: Integer;
   Line: string;
   Chats: TList;
   Chat: TChat;
 begin
-  Count := 0;
+  MessageCount := 0;
+  ChatCount := 0;
   ToolTip := 'WhatsApp';
 
   Chats := TList.Create;
@@ -449,13 +448,15 @@ begin
          (Chat.SetUnread or (Chat.UnreadMessages > 0)) and
          (not (Chat.Muted and ExcludeMuted)) then
       begin
-        Count += IfThen<Integer>(Chat.SetUnread, 1, Chat.UnreadMessages);
+        MessageCount += IfThen<Integer>(Chat.SetUnread, 1, Chat.UnreadMessages);
+        ChatCount += 1;
         Chats.Add(Chat);
       end;
 
     Chats.Sort(SortChats);
 
-    Processed := 0;
+    ProcessedMessages := 0;
+    ProcessedChats := 0;
 
     for Chat in Chats do
     begin
@@ -466,11 +467,12 @@ begin
 
       if ToolTip.Length + Line.Length + Tail.Length + 2 < MaxToolTipLen then
       begin
-        Processed += IfThen<Integer>(Chat.SetUnread, 1, Chat.UnreadMessages);
-        ToolTip += Line
+        ProcessedChats += 1;
+        ProcessedMessages += IfThen<Integer>(Chat.SetUnread, 1, Chat.UnreadMessages);
+        ToolTip += Line;
       end else
       begin
-        ToolTip += Tail.Format([Count - Processed]);
+        ToolTip += Tail.Format([ChatCount - ProcessedChats]);
         Break;
       end;
     end;
@@ -580,7 +582,6 @@ begin
   FExcludeUnreadMessagesMutedChats := Boolean(MS.ReadByte);
   FNotificationIconBadgeColor := MS.ReadDWord;
   FNotificationIconBadgeTextColor := MS.ReadDWord;
-  FRemoveRoundedElementCorners := Boolean(MS.ReadByte);
   FUseRegularTitleBar := Boolean(MS.ReadByte);
   FHideMaximize := Boolean(MS.ReadByte);
   FAlwaysOnTop := Boolean(MS.ReadByte);
@@ -621,7 +622,6 @@ begin
   MS.WriteByte(Byte(FExcludeUnreadMessagesMutedChats));
   MS.WriteDWord(FNotificationIconBadgeColor);
   MS.WriteDWord(FNotificationIconBadgeTextColor);
-  MS.WriteByte(Byte(FRemoveRoundedElementCorners));
   MS.WriteByte(Byte(FUseRegularTitleBar));
   MS.WriteByte(Byte(FHideMaximize));
   MS.WriteByte(Byte(FAlwaysOnTop));

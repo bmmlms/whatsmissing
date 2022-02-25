@@ -359,6 +359,17 @@ begin
             FileInfo.Modified := True;
           end;
 
+        if FSettings.UseSquaredProfileImages then
+        begin
+          CssRule := TCSSRule.Create;
+          CssRule.Selectors.Add(TCSSValue.Create('.message-out img'));
+          CssRule.Selectors.Add(TCSSValue.Create('.message-in img'));
+          CssRule.Selectors.Add(TCSSValue.Create('#side img'));
+          CssRule.Selectors.Add(TCSSValue.Create('.two #main img'));
+          CssRule.Declarations.Add(TCSSDeclaration.Create('border-radius', '0!important'));
+          FileInfo.CssDocument.Rules.Add(CssRule);
+        end;
+
         if FSettings.UseRegularTitleBar then
         begin
           CssRule := FileInfo.CssDocument.FindRule('html[dir] #windows-title-bar');
@@ -490,6 +501,8 @@ begin
     FContentOffset := Asar.Header.ContentOffset;
 
     Asar.Header.Write(FJSON);
+
+    asar.Write('e:\tmp.asar');
   finally
     Asar.Free;
 

@@ -122,6 +122,7 @@ type
     FUsePreRenderedOverlays: Boolean;
     FExcludeUnreadMessagesMutedChats: Boolean;
     FRemoveRoundedElementCorners: Boolean;
+    FUseSquaredProfileImages: Boolean;
     FUseRegularTitleBar: Boolean;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
@@ -151,6 +152,7 @@ type
     property UsePreRenderedOverlays: Boolean read FUsePreRenderedOverlays write FUsePreRenderedOverlays;
     property ExcludeUnreadMessagesMutedChats: Boolean read FExcludeUnreadMessagesMutedChats write FExcludeUnreadMessagesMutedChats;
     property RemoveRoundedElementCorners: Boolean read FRemoveRoundedElementCorners write FRemoveRoundedElementCorners;
+    property UseSquaredProfileImages: Boolean read FUseSquaredProfileImages write FUseSquaredProfileImages;
     property UseRegularTitleBar: Boolean read FUseRegularTitleBar write FUseRegularTitleBar;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
@@ -208,6 +210,7 @@ begin
         FShowNotificationIcon := JSONObject.Get('ShowNotificationIcon', FShowNotificationIcon);
         FShowUnreadMessagesBadge := JSONObject.Get('ShowUnreadMessagesBadge', FShowUnreadMessagesBadge);
         FRemoveRoundedElementCorners := JSONObject.Get('RemoveRoundedElementCorners', FRemoveRoundedElementCorners);
+        FUseSquaredProfileImages := JSONObject.Get('UseSquaredProfileImages', FUseSquaredProfileImages);
         FUsePreRenderedOverlays := JSONObject.Get('UsePreRenderedOverlays', FUsePreRenderedOverlays);
         FExcludeUnreadMessagesMutedChats := JSONObject.Get('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
         FUseRegularTitleBar := JSONObject.Get('UseRegularTitleBar', FUseRegularTitleBar);
@@ -266,6 +269,7 @@ begin
     JSONObject.Add('UsePreRenderedOverlays', FUsePreRenderedOverlays);
     JSONObject.Add('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
     JSONObject.Add('RemoveRoundedElementCorners', FRemoveRoundedElementCorners);
+    JSONObject.Add('UseSquaredProfileImages', FUseSquaredProfileImages);
     JSONObject.Add('UseRegularTitleBar', FUseRegularTitleBar);
     JSONObject.Add('HideMaximize', FHideMaximize);
     JSONObject.Add('AlwaysOnTop', FAlwaysOnTop);
@@ -311,7 +315,6 @@ begin
   MMF.ExcludeUnreadMessagesMutedChats := FExcludeUnreadMessagesMutedChats;
   MMF.NotificationIconBadgeColor := ColorToRGB(FNotificationIconBadgeColor.GetColor(caNone));
   MMF.NotificationIconBadgeTextColor := ColorToRGB(FNotificationIconBadgeTextColor.GetColor(caNone));
-  MMF.RemoveRoundedElementCorners := FRemoveRoundedElementCorners;
   MMF.UseRegularTitleBar := FUseRegularTitleBar;
   MMF.HideMaximize := FHideMaximize;
   MMF.AlwaysOnTop := FAlwaysOnTop;
@@ -366,7 +369,7 @@ begin
 
   FColorSettings.Add(TColorSettingResource.Create(11, 'New voice mail icon', ImmersiveLightWUError, [TColorSettingResourcePatch.Create('--ptt-green').UpdateInFile('svg.*.js')]));
 
-  FColorSettings.Add(TColorSettingResource.Create(12, 'Acknowledged icons', ImmersiveLightWUNormal, [TColorSettingResourcePatch.Create('--icon-ack')]));
+  FColorSettings.Add(TColorSettingResource.Create(12, 'Acknowledged icons', ImmersiveLightWUNormal, [TColorSettingResourcePatch.Create('--ptt-blue')]));
 
   FColorSettings.Add(TColorSettingResource.Create(13, '"Typing..." notification', ImmersiveSaturatedCommandRowPressed, [TColorSettingResourcePatch.Create('--typing')]));
 
@@ -408,6 +411,7 @@ begin
   FUsePreRenderedOverlays := True;
   FExcludeUnreadMessagesMutedChats := False;
   FRemoveRoundedElementCorners := False;
+  FUseSquaredProfileImages := False;
   FUseRegularTitleBar := False;
   FHideMaximize := False;
   FAlwaysOnTop := False;
@@ -437,6 +441,8 @@ begin
       MD5Update(MD5Ctx, ColorType, SizeOf(ColorType));
     end;
   Bool := FRemoveRoundedElementCorners;
+  MD5Update(MD5Ctx, Bool, SizeOf(Bool));
+  Bool := FUseSquaredProfileImages;
   MD5Update(MD5Ctx, Bool, SizeOf(Bool));
   Bool := FUseRegularTitleBar;
   MD5Update(MD5Ctx, Bool, SizeOf(Bool));

@@ -79,6 +79,7 @@ type
   TfrmSettings = class(TForm)
     Bevel1: TBevel;
     btnSave: TBitBtn;
+    chkUseSquaredProfileImages: TCheckBox;
     chkUseRegularTitleBar: TCheckBox;
     chkShowUnreadMessagesBadge: TCheckBox;
     chkExcludeUnreadMessagesMutedChats: TCheckBox;
@@ -162,6 +163,7 @@ begin
   chkUsePreRenderedOverlays.Checked := FSettings.UsePreRenderedOverlays;
   chkExcludeUnreadMessagesMutedChats.Checked := FSettings.ExcludeUnreadMessagesMutedChats;
   chkRemoveRoundedElementCorners.Checked := FSettings.RemoveRoundedElementCorners;
+  chkUseSquaredProfileImages.Checked := FSettings.UseSquaredProfileImages;
   chkUseRegularTitleBar.Checked := FSettings.UseRegularTitleBar;
   chkHideMaximize.Checked := FSettings.HideMaximize;
   chkSuppressPresenceAvailable.Checked := FSettings.SuppressPresenceAvailable;
@@ -245,6 +247,7 @@ begin
     SaveSettings.UsePreRenderedOverlays := chkUsePreRenderedOverlays.Checked;
     SaveSettings.ExcludeUnreadMessagesMutedChats := chkExcludeUnreadMessagesMutedChats.Checked;
     SaveSettings.RemoveRoundedElementCorners := chkRemoveRoundedElementCorners.Checked;
+    SaveSettings.UseSquaredProfileImages := chkUseSquaredProfileImages.Checked;
     SaveSettings.UseRegularTitleBar := chkUseRegularTitleBar.Checked;
     SaveSettings.HideMaximize := chkHideMaximize.Checked;
     SaveSettings.SuppressPresenceAvailable := chkSuppressPresenceAvailable.Checked;

@@ -419,7 +419,7 @@ procedure TWindow.ShowOrUpdateNotificationIcon;
 const
   Days = 365;
 var
-  UnreadMessageCount: Integer;
+  UnreadChatCount: Integer;
   ToolTip: string;
 begin
   FNotificationAreaHandle := FindWindow('Shell_TrayWnd', nil);
@@ -439,12 +439,12 @@ begin
 
   FMMFLauncher.Read;
 
-  FMMFLauncher.Chats.GetUnreadChats(Days, Length(FNotifyData.szTip), FMMFLauncher.ExcludeUnreadMessagesMutedChats, UnreadMessageCount, ToolTip);
+  FMMFLauncher.Chats.GetUnreadChats(Days, Length(FNotifyData.szTip), FMMFLauncher.ExcludeUnreadMessagesMutedChats, UnreadChatCount, ToolTip);
 
   if FMMFLauncher.UsePreRenderedOverlays then
-    FNotifyData.hIcon := CreateNotificationIconPreRendered(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadMessageCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor)
+    FNotifyData.hIcon := CreateNotificationIconPreRendered(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadChatCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor)
   else
-    FNotifyData.hIcon := CreateNotificationIconDrawn(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadMessageCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor);
+    FNotifyData.hIcon := CreateNotificationIconDrawn(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadChatCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor);
 
   StrPLCopy(FNotifyData.szTip, ToolTip, Length(FNotifyData.szTip) - 1);
 

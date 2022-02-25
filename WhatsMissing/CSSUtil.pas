@@ -23,7 +23,8 @@ type
     function FGetValue: AnsiString;
     procedure FSetValue(const Value: AnsiString);
   public
-    constructor Create(const MemStart, MemEnd: PAnsiChar);
+    constructor Create(const MemStart, MemEnd: PAnsiChar); overload;
+    constructor Create(const Value: AnsiString); overload;
 
     function ValueEquals(Value: AnsiString): Boolean;
 
@@ -517,7 +518,7 @@ end;
 
 { TCSSValue }
 
-function TCSSValue.FGetValue: AnsisTring;
+function TCSSValue.FGetValue: AnsiString;
 begin
   if FModified then
     Exit(FValue)
@@ -535,6 +536,11 @@ constructor TCSSValue.Create(const MemStart, MemEnd: PAnsiChar);
 begin
   FMemory := MemStart;
   FSize := MemEnd - MemStart + 1;
+end;
+
+constructor TCSSValue.Create(const Value: AnsiString);
+begin
+  FSetValue(Value);
 end;
 
 function TCSSValue.ValueEquals(Value: AnsiString): Boolean;
