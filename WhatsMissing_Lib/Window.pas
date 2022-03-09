@@ -446,6 +446,8 @@ begin
   else
     FNotifyData.hIcon := CreateNotificationIconDrawn(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadChatCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor);
 
+  // SendMessage(FHandle, WM_SETICON, ICON_SMALL, FNotifyData.hIcon);
+
   StrPLCopy(FNotifyData.szTip, ToolTip, Length(FNotifyData.szTip) - 1);
 
   if not FNotificationIconVisible then
@@ -643,12 +645,25 @@ type
     end;
   end;
 
-  function BuildImage(const BitmapStart, BitmapEnd: Pointer; const Width, Height: Integer; const BackgroundColor, TextColor: TColor; const BackgroundLightness, TextLightness: LongInt): TByteArray;  // TODO: warum longint?!
+  function BuildImage(const BitmapStart, BitmapEnd: Pointer; const Width, Height: Integer; const BackgroundColor, TextColor: TColor): TByteArray;
   var
-    HB, LB, SB, HF, LF, SF, L: Byte;
+    HB, LB, SB, HF, LF, SF: Byte;
+    MaxBL: Byte = 0;
+    MaxFL: Byte = 0;
     PixelData: PPixelData;
     RGBQuad: PRGBQUAD;
   begin
+    PixelData := BitmapStart;
+    while PixelData < BitmapEnd do
+    begin
+      if PixelData^.IsBackground and (PixelData^.Lightness > MaxBL) then
+        MaxBL := PixelData^.Lightness
+      else if not PixelData^.IsBackground and (PixelData^.Lightness > MaxFL) then
+        MaxFL := PixelData^.Lightness;
+
+      PixelData := PPixelData(NativeUInt(PixelData) + SizeOf(TPixelData));
+    end;
+
     SetLength(Result, Width * Height * SizeOf(TRGBQUAD));
 
     ColorToHLS(BackgroundColor, HB, LB, SB);
@@ -658,15 +673,10 @@ type
     RGBQuad := @Result[0];
     while PixelData < BitmapEnd do
     begin
-      if PixelData^.IsBackground = $01 then
-      begin
-        L := Math.Min(255, Math.Max(0, LB + (PixelData^.Lightness - BackgroundLightness)));
-        HLStoRGB(HB, L, SB, RGBQuad^.rgbRed, RGBQuad^.rgbGreen, RGBQuad^.rgbBlue);
-      end else
-      begin
-        L := Math.Min(255, Math.Max(0, LF + (PixelData^.Lightness - TextLightness)));
-        HLStoRGB(HF, L, SF, RGBQuad^.rgbRed, RGBQuad^.rgbGreen, RGBQuad^.rgbBlue);
-      end;
+      if PixelData^.IsBackground then
+        HLStoRGB(HB, Trunc(LB * ((255 - (MaxBL - PixelData^.Lightness)) / 255)), SB, RGBQuad^.rgbRed, RGBQuad^.rgbGreen, RGBQuad^.rgbBlue)
+      else
+        HLStoRGB(HF, Trunc(LF * ((255 - (MaxFL - PixelData^.Lightness)) / 255)), SF, RGBQuad^.rgbRed, RGBQuad^.rgbGreen, RGBQuad^.rgbBlue);
 
       RGBQuad^.rgbReserved := PixelData.Alpha;
 
@@ -711,7 +721,7 @@ begin
   NOI := GetNotificationOverlay(UnreadCount);
   if Assigned(NOI) then
   begin
-    NotificationBitmap := BuildImage(NOI^.Data, Pointer(NativeUInt(NOI^.Data) + (NOI^.Width * NOI^.Height * SizeOf(TPixelData))), NOI^.Width, NOI^.Height, BackgroundColor, TextColor, NOI^.BackgroundLightness, NOI^.TextLightness);
+    NotificationBitmap := BuildImage(NOI^.Data, Pointer(NativeUInt(NOI^.Data) + (NOI^.Width * NOI^.Height * SizeOf(TPixelData))), NOI^.Width, NOI^.Height, BackgroundColor, TextColor);
     Draw(BitmapStart, @NotificationBitmap[0], BitmapInfo.bmWidth - NOI^.Width, BitmapInfo.bmHeight - NOI^.Height, BitmapInfo.bmWidth, NOI^.Width, NOI^.Height);
   end;
 
