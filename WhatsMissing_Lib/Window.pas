@@ -306,11 +306,12 @@ begin
     end;
     WM_NCCALCSIZE, WM_NCACTIVATE:
       if FMMFLauncher.UseRegularTitleBar then
-        Exit(DefWindowProcW(FHandle, uMsg, wParam, lParam))
-      else if uMsg = FTaskbarCreatedMsg then
+        Exit(DefWindowProcW(FHandle, uMsg, wParam, lParam));
+    else
+      if uMsg = FTaskbarCreatedMsg then
       begin
-        if FMMFLauncher.ShowNotificationIcon then
-          ShowOrUpdateNotificationIcon;
+        HideNotificationIcon;
+        ShowOrUpdateNotificationIcon;
         Exit(0);
       end;
   end;
