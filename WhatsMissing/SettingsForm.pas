@@ -104,6 +104,8 @@ type
   private
     FSettings: TSettings;
     FMMFSettings: TMMFSettings;
+
+    procedure ScaleDPI(const Control: TControl; const FromDPI: Integer);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -129,6 +131,8 @@ begin
   TFunctions.SetPropertyStore(Handle, TPaths.ExePath, TPaths.WhatsAppExePath);
 
   FSettings := TSettings.Create(TPaths.SettingsPath);
+
+  ScaleDPI(Self, 96);
 end;
 
 destructor TfrmSettings.Destroy;
@@ -215,6 +219,33 @@ begin
   begin
     Key := 0;
     Close;
+  end;
+end;
+
+procedure TfrmSettings.ScaleDPI(const Control: TControl; const FromDPI: Integer);
+var
+  n: Integer;
+  WinControl: TWinControl;
+begin
+  if Screen.PixelsPerInch = FromDPI then
+    Exit;
+
+  with Control do
+  begin
+    Left := ScaleX(Left, FromDPI);
+    Top := ScaleY(Top, FromDPI);
+    Width := ScaleX(Width, FromDPI);
+    Height := ScaleY(Height, FromDPI);
+    Font.Height := ScaleY(Font.GetTextHeight('Hg'), FromDPI);
+  end;
+
+  if Control is TWinControl then
+  begin
+    WinControl := TWinControl(Control);
+    if WinControl.ControlCount > 0 then
+      for n := 0 to WinControl.ControlCount - 1 do
+        if WinControl.Controls[n] is TControl then
+          ScaleDPI(WinControl.Controls[n], FromDPI);
   end;
 end;
 
@@ -337,6 +368,7 @@ begin
   RightContainer.BorderStyle := bsNone;
   RightContainer.Color := clNone;
   RightContainer.Parent := Self;
+  RightContainer.Constraints.MinWidth := Trunc(TWinControl(AOwner).Width * 0.4);
 
   FComboColorType := TComboBoxEx.Create(Self);
   FComboColorType.Align := alClient;
