@@ -81,12 +81,7 @@ type
     btnSave: TBitBtn;
     chkUseSquaredProfileImages: TCheckBox;
     chkUseRegularTitleBar: TCheckBox;
-    chkShowUnreadMessagesBadge: TCheckBox;
-    chkExcludeUnreadMessagesMutedChats: TCheckBox;
-    chkUsePreRenderedOverlays: TCheckBox;
     chkSuppressConsecutiveNotificationSounds: TCheckBox;
-    chkSuppressPresenceAvailable: TCheckBox;
-    chkSuppressPresenceComposing: TCheckBox;
     chkHideMaximize: TCheckBox;
     chkShowNotificationIcon: TCheckBox;
     chkRemoveRoundedElementCorners: TCheckBox;
@@ -97,7 +92,6 @@ type
     tbsSettings: TTabSheet;
     tbsColors: TTabSheet;
     procedure btnSaveClick(Sender: TObject);
-    procedure CheckBoxChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormShow(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -149,36 +143,15 @@ procedure TfrmSettings.FormShow(Sender: TObject);
 var
   i: Integer;
   SettingControl: TColorSettingControlBase;
-  MeasureCheckBox: TCheckBox;
-  CheckBoxRect: TRect;
   ColorSetting: TColorSettingBase;
   MMFLauncher: TMMFLauncher;
 begin
-  MeasureCheckBox := TCheckBox.Create(Self);
-  try
-    MeasureCheckBox.Parent := Self;
-    CheckBoxRect := MeasureCheckBox.ClientRect;
-  finally
-    MeasureCheckBox.Free;
-  end;
-
   chkShowNotificationIcon.Checked := FSettings.ShowNotificationIcon;
-  chkShowUnreadMessagesBadge.Checked := FSettings.ShowUnreadMessagesBadge;
-  chkUsePreRenderedOverlays.Checked := FSettings.UsePreRenderedOverlays;
-  chkExcludeUnreadMessagesMutedChats.Checked := FSettings.ExcludeUnreadMessagesMutedChats;
   chkRemoveRoundedElementCorners.Checked := FSettings.RemoveRoundedElementCorners;
   chkUseSquaredProfileImages.Checked := FSettings.UseSquaredProfileImages;
   chkUseRegularTitleBar.Checked := FSettings.UseRegularTitleBar;
   chkHideMaximize.Checked := FSettings.HideMaximize;
-  chkSuppressPresenceAvailable.Checked := FSettings.SuppressPresenceAvailable;
-  chkSuppressPresenceComposing.Checked := FSettings.SuppressPresenceComposing;
   chkSuppressConsecutiveNotificationSounds.Checked := FSettings.SuppressConsecutiveNotificationSounds;
-
-  CheckBoxChange(nil);
-
-  chkShowUnreadMessagesBadge.BorderSpacing.Left := CheckBoxRect.Width;
-  chkUsePreRenderedOverlays.BorderSpacing.Left := CheckBoxRect.Width;
-  chkExcludeUnreadMessagesMutedChats.BorderSpacing.Left := CheckBoxRect.Width;
 
   MMFLauncher := TMMFLauncher.Create(False);
   try
@@ -274,15 +247,10 @@ begin
         end;
 
     SaveSettings.ShowNotificationIcon := chkShowNotificationIcon.Checked;
-    SaveSettings.ShowUnreadMessagesBadge := chkShowUnreadMessagesBadge.Checked;
-    SaveSettings.UsePreRenderedOverlays := chkUsePreRenderedOverlays.Checked;
-    SaveSettings.ExcludeUnreadMessagesMutedChats := chkExcludeUnreadMessagesMutedChats.Checked;
     SaveSettings.RemoveRoundedElementCorners := chkRemoveRoundedElementCorners.Checked;
     SaveSettings.UseSquaredProfileImages := chkUseSquaredProfileImages.Checked;
     SaveSettings.UseRegularTitleBar := chkUseRegularTitleBar.Checked;
     SaveSettings.HideMaximize := chkHideMaximize.Checked;
-    SaveSettings.SuppressPresenceAvailable := chkSuppressPresenceAvailable.Checked;
-    SaveSettings.SuppressPresenceComposing := chkSuppressPresenceComposing.Checked;
     SaveSettings.SuppressConsecutiveNotificationSounds := chkSuppressConsecutiveNotificationSounds.Checked;
 
     try
@@ -332,18 +300,6 @@ begin
     end;
   finally
     SaveSettings.Free;
-  end;
-end;
-
-procedure TfrmSettings.CheckBoxChange(Sender: TObject);
-begin
-  if (Sender = nil) or (Sender = chkShowNotificationIcon) then
-    chkShowUnreadMessagesBadge.Enabled := chkShowNotificationIcon.Checked;
-
-  if (Sender = nil) or (Sender = chkShowNotificationIcon) or (Sender = chkShowUnreadMessagesBadge) then
-  begin
-    chkUsePreRenderedOverlays.Enabled := chkShowNotificationIcon.Checked and chkShowUnreadMessagesBadge.Checked;
-    chkExcludeUnreadMessagesMutedChats.Enabled := chkShowNotificationIcon.Checked and chkShowUnreadMessagesBadge.Checked;
   end;
 end;
 

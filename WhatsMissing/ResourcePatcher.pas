@@ -143,11 +143,7 @@ const
 
   AddCursorDefault: array[0..2] of string = ('#windows-title-minimize', '#windows-title-maximize', '#windows-title-close');
 
-  JsRegExReplacements: array[0..3] of TRegExReplace = (
-    (FilePattern: ['bootstrap_main.*.js']; Search: 'return (.)\.apply\(this,arguments\)}}\(\),this\.write='; Replace: 'return $1.apply(this,arguments).then(function (vv) { window.wmcall("socket_in", vv); return vv; }); }}(),this.write='),
-    (FilePattern: ['bootstrap_main.*.js']; Search: 'return (.)\.writeNode\((.),(.)\),(.)\.encrypt\((.)\.toBuffer\(\)\)\}\)\)';
-    Replace: 'if (!window.wmcall("socket_out", $3)) return; return $1.writeNode($2,$3),$4.encrypt($5.toBuffer())}))'),
-    (FilePattern: ['bootstrap_main.*.js']; Search: 'var (.)=this\.parseMsg\((.)\[0\],"relay"\);'; Replace: 'var $1=this.parseMsg($2[0],"relay"); window.wmcall("message", {sent: $1.id.fromMe, jid: $1.id.remote});'),
+  JsRegExReplacements: array[0..0] of TRegExReplace = (
     (FilePattern: ['bootstrap_main.*.js']; Search: '(.)\.MuteCollection\.getGlobalSounds\(\)&&\((.)\.id'; Replace: 'window.wmcall("ask_notification_sound", $2.id) &&$1.MuteCollection.getGlobalSounds()&&($2.id'));
 
 var

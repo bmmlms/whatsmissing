@@ -368,68 +368,16 @@ begin
 end;
 
 class function THooks.HWriteFile(hFile: HANDLE; lpBuffer: LPVOID; nNumberOfBytesToWrite: DWORD; lpNumberOfBytesWritten: PDWORD; lpOverlapped: POverlapped): BOOL; stdcall;
-
-type
-  TWhatsAppData = record
-    MessageType: string;
-    MessageSubType: string;
-    DataType: string;
-    DataSubType: string;
-  end;
-
-  function ParseWhatsAppData(Data: TJSONData): TWhatsAppData;
-  var
-    D: TJSONData;
-  begin
-    D := Data.FindPath('[0]');
-    if Assigned(D) and (D.ClassType = TJSONString) then
-      Result.MessageType := D.Value;
-
-    D := Data.FindPath('[1].type');
-    if Assigned(D) and (D.ClassType = TJSONString) then
-      Result.MessageSubType := D.Value;
-
-    D := Data.FindPath('[2][0][0]');
-    if Assigned(D) and (D.ClassType = TJSONString) then
-      Result.DataType := D.Value;
-
-    D := Data.FindPath('[2][0][1].type');
-    if Assigned(D) and (D.ClassType = TJSONString) then
-      Result.DataSubType := D.Value;
-  end;
-
-  procedure SetUnreadMessages(const Chat: TChat; const SetUnread: Boolean; const UnreadMessages: UInt16);
-  begin
-    if (not SetUnread) and (UnreadMessages > 0) then
-      Chat.UpdateLastCommunication;
-
-    Chat.SetUnreadMessages(SetUnread, UnreadMessages);
-    if (not SetUnread) and (UnreadMessages = 0) then
-      Chat.LastNotificationSound := 0;
-
-    FLog.Debug('Updated Count: %s'.Format([Chat.ToString]));
-
-    FMMFLauncher.Write;
-
-    PostMessage(FMMFLauncher.WhatsAppWindowHandle, WM_CHAT, 0, 0);
-  end;
-
 var
   JSONObject: TJSONObject;
-  JSONArray: TJSONArray;
   JSONData: TJSONData;
-  JSONEnum: TJSONEnum;
   Chat: TChat;
-  WhatsAppData: TWhatsAppData = (MessageType: ''; MessageSubType: ''; DataType: ''; DataSubType: '');
   JSON: TMemoryStream;
 begin
   if hFile = FWACommunicationHandle then
   begin
     if Assigned(FWAMethodResult) then
       raise Exception.Create('Assigned(FWAMethodResult)');
-
-    // Required to refresh chat list/WhatsAppWindowHandle
-    FMMFLauncher.Read;
 
     EnterCriticalSection(FCommunicationLock);
 
@@ -447,108 +395,7 @@ begin
         raise Exception.Create('Received invalid data');
 
       try
-        if (JSONObject.Strings['method'] = 'socket_in') or (JSONObject.Strings['method'] = 'socket_out') then
-        begin
-          WhatsAppData := ParseWhatsAppData(JSONData);
-
-          if (WhatsAppData.MessageType = 'action') and (WhatsAppData.DataType = 'chat') and (WhatsAppData.DataSubType = 'mute') then
-          begin
-            // A chat was muted/unmuted, mute -1 is forever, 0 is unmuted, otherwise it's the expiration timestamp
-            // Mobile:  {"method":"socket_in","data":["action",null,[["chat",{"jid":"0000000000000@c.us","type":"mute","mute":"0"},null]]]}
-            // Desktop: {"method":"socket_out","data":["action",{"type":"set","epoch":"4"},[["chat",{"type":"mute","mute":"1614750129","jid":"0000000000000@c.us"},null]]]}
-
-            Chat := FMMFLauncher.Chats.Get(JSONData.FindPath('[2][0][1].jid').Value);
-
-            if Assigned(JSONData.FindPath('[2][0][1].mute')) then
-              Chat.SetMute(JSONData.FindPath('[2][0][1].mute').Value)
-            else
-              Chat.SetMute(0);
-
-            FLog.Debug('Updated Mute: %s'.Format([Chat.ToString]));
-
-            FMMFLauncher.Write;
-
-            PostMessage(FMMFLauncher.WhatsAppWindowHandle, WM_CHAT, 0, 0);
-          end;
-        end;
-
-        if JSONObject.Strings['method'] = 'socket_in' then
-        begin
-          if (WhatsAppData.MessageType = 'response') and (WhatsAppData.MessageSubType = 'chat') and (WhatsAppData.DataType = 'chat') then
-          begin
-            // This is the initial chat list response
-            // {"method":"socket_in","data":["response",{"type":"chat"},[["chat",{"jid":"000000000000@c.us","count":"0","t":"1555698965","mute":"0","spam":"false"},null], ...
-
-            FLog.Debug('Received initial chat list');
-
-            FMMFLauncher.Chats.Clear;
-
-            for JSONEnum in TJSONArray(JSONData.FindPath('[2]')) do
-            begin
-              JSONArray := TJSONArray(JSONEnum.Value);
-
-              Chat := FMMFLauncher.Chats.Get(JSONArray[1].FindPath('jid').Value);
-
-              Chat.SetMute(JSONArray[1].FindPath('mute').Value);
-              Chat.SetUnreadMessages(JSONArray[1].FindPath('count').Value = -1, IfThen<UInt16>(JSONArray[1].FindPath('count').Value > 0, JSONArray[1].FindPath('count').Value, 0));
-              if Assigned(JSONArray[1].FindPath('name')) then
-                Chat.Name := JSONArray[1].FindPath('name').Value;
-              Chat.LastCommunication := JSONArray[1].FindPath('t').Value;
-
-              FLog.Debug('  Added chat: %s'.Format([Chat.ToString]));
-            end;
-
-            FMMFLauncher.Write;
-
-            PostMessage(FMMFLauncher.WhatsAppWindowHandle, WM_CHAT, 0, 0);
-          end else if (WhatsAppData.MessageType = 'action') and (WhatsAppData.DataType = 'read') then
-          begin
-            // A chats read state changed
-            // Read:   {"method":"socket_in","data":["action",null,[["read",{"jid":"0000000000000@c.us"},null]]]}
-            // Unread: {"method":"socket_in","data":["action",null,[["read",{"jid":"0000000000000@c.us","type":"false"},null]]]}
-
-            FLog.Debug('Read chat message');
-
-            SetUnreadMessages(FMMFLauncher.Chats.Get(JSONData.FindPath('[2][0][1].jid').Value), Assigned(JSONData.FindPath('[2][0][1].type')) and JSONData.FindPath('[2][0][1].type').AsBoolean, 0);
-          end;
-        end else if JSONObject.Strings['method'] = 'socket_out' then
-        begin
-          if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'relay') and (WhatsAppData.DataType = 'message') then
-            FLog.Debug('Sent chat message')
-          else if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'set') and (WhatsAppData.DataType = 'read') and Assigned(JSONData.FindPath('[2][0][1].count')) then
-          begin
-            // A chats read state changed
-            // {"method":"socket_out","data":["action",{"type":"set","epoch":"5"},[["read",{"jid":"0000000000000@c.us","index":"C5F4B6909150C9968BA4997601BE0C8A","owner":"false","count":"5"},null]]]}
-
-            FLog.Debug('Read chat message');
-
-            SetUnreadMessages(FMMFLauncher.Chats.Get(JSONData.FindPath('[2][0][1].jid').Value), JSONData.FindPath('[2][0][1].count').Value = -2, 0);
-          end else if (WhatsAppData.MessageType = 'action') and (WhatsAppData.MessageSubType = 'set') and (WhatsAppData.DataType = 'presence') then
-            if FMMFLauncher.SuppressPresenceAvailable and (WhatsAppData.DataSubType = 'available') then
-              FWAMethodResult := TJSONBoolean.Create(False)
-            else if FMMFLauncher.SuppressPresenceComposing and (WhatsAppData.DataSubType = 'composing') then
-              FWAMethodResult := TJSONBoolean.Create(False);
-
-          if not Assigned(FWAMethodResult) then
-            FWAMethodResult := TJSONBoolean.Create(True)
-          else
-            FLog.Debug('  Suppressing data');
-        end else if JSONObject.Strings['method'] = 'message' then
-        begin
-          // A chat message was sent/received
-          // {"method":"message","data":{"sent":false,"jid":"0000000000000@c.us"}}
-
-          if JSONData.FindPath('sent').AsBoolean then
-            FLog.Debug('Sent chat message')
-          else if not FMMFLauncher.Chats.Get(JSONData.FindPath('jid').Value).Muted then
-          begin
-            FLog.Debug('Received chat message');
-
-            Chat := FMMFLauncher.Chats.Get(JSONData.FindPath('jid').Value);
-
-            SetUnreadMessages(Chat, False, Chat.UnreadMessages + 1);
-          end;
-        end else if JSONObject.Strings['method'] = 'ask_notification_sound' then
+        if JSONObject.Strings['method'] = 'ask_notification_sound' then
         begin
           // WhatsApp is about to play the notification sound for a received message
           // {"method":"ask_notification_sound","data":"0000000000000@c.us"}

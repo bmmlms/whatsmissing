@@ -3,13 +3,10 @@ unit Window;
 interface
 
 uses
-  ColorFunctions,
   Constants,
   Functions,
   Log,
-  Math,
   MMF,
-  NotificationOverlays,
   Paths,
   ShellAPI,
   SysUtils,
@@ -93,8 +90,7 @@ type
     procedure ModifySystemMenu;
     procedure CreateNotificationMenu;
     procedure SetAlwaysOnTop(const Enabled: Boolean);
-    function CreateNotificationIconPreRendered(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
-    function CreateNotificationIconDrawn(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
+    function CreateNotificationIcon: HICON;
   public
     constructor Create(const hwnd: HWND; const Log: TLog);
     destructor Destroy; override;
@@ -255,11 +251,6 @@ begin
       RemovePropW(FHandle, WNDPROC_PROPNAME);
       TFunctions.ClearPropertyStore(FHandle);
       DestroyMenu(FNotificationMenu);
-    end;
-    WM_CHAT:
-    begin
-      ShowOrUpdateNotificationIcon;
-      Exit(0);
     end;
     WM_ACTIVATE_INSTANCE:
     begin
@@ -442,10 +433,7 @@ begin
 
   FMMFLauncher.Chats.GetUnreadChats(Days, Length(FNotifyData.szTip), FMMFLauncher.ExcludeUnreadMessagesMutedChats, UnreadChatCount, ToolTip);
 
-  if FMMFLauncher.UsePreRenderedOverlays then
-    FNotifyData.hIcon := CreateNotificationIconPreRendered(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadChatCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor)
-  else
-    FNotifyData.hIcon := CreateNotificationIconDrawn(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadChatCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor);
+  FNotifyData.hIcon := CreateNotificationIcon;
 
   // SendMessage(FHandle, WM_SETICON, ICON_SMALL, FNotifyData.hIcon);
 
@@ -604,96 +592,13 @@ begin
   AppendMenu(FNotificationMenu, MF_STRING, MENU_EXIT, '&Close');
 end;
 
-function TWindow.CreateNotificationIconPreRendered(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
-type
-  TByteArray = array of Byte;
-
-  procedure Draw(const Dst, Src: Pointer; X, Y, DstWidth, SrcWidth, SrcHeight: Integer);
-  var
-    SrcCnt: Integer;
-    DstRgb, SrcRgb: PRGBQUAD;
-    OffsetX: UInt32;
-    A: Byte;
-  begin
-    OffsetX := X * SizeOf(TRGBQUAD);
-
-    SrcRgb := Src;
-    DstRgb := (Dst + Y * DstWidth * SizeOf(TRGBQUAD)) + OffsetX;
-
-    SrcCnt := 0;
-    while SrcRgb < Src + (SrcWidth * SrcHeight * SizeOF(TRGBQUAD)) do
-    begin
-      A := Trunc(SrcRgb.rgbReserved + (DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255));
-
-      if A > 0 then
-      begin
-        DstRgb.rgbRed := Trunc((SrcRgb.rgbRed * SrcRgb.rgbReserved + DstRgb.rgbRed * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / A);
-        DstRgb.rgbGreen := Trunc((SrcRgb.rgbGreen * SrcRgb.rgbReserved + DstRgb.rgbGreen * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / A);
-        DstRgb.rgbBlue := Trunc((SrcRgb.rgbBlue * SrcRgb.rgbReserved + DstRgb.rgbBlue * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / A);
-      end;
-
-      DstRgb.rgbReserved := A;
-
-      SrcRgb := PRGBQUAD(NativeUInt(SrcRgb) + SizeOf(TRGBQUAD));
-      Inc(SrcCnt);
-
-      if SrcCnt mod SrcWidth = 0 then
-      begin
-        Inc(Y);
-        DstRgb := (Dst + Y * DstWidth * SizeOf(TRGBQUAD)) + OffsetX;
-      end else
-        DstRgb := PRGBQUAD(NativeUInt(DstRgb) + SizeOf(TRGBQUAD));
-    end;
-  end;
-
-  function BuildImage(const BitmapStart, BitmapEnd: Pointer; const Width, Height: Integer; const BackgroundColor, TextColor: TColor): TByteArray;
-  var
-    HB, LB, SB, HF, LF, SF: Byte;
-    MaxBL: Byte = 0;
-    MaxFL: Byte = 0;
-    PixelData: PPixelData;
-    RGBQuad: PRGBQUAD;
-  begin
-    PixelData := BitmapStart;
-    while PixelData < BitmapEnd do
-    begin
-      if PixelData^.IsBackground and (PixelData^.Lightness > MaxBL) then
-        MaxBL := PixelData^.Lightness
-      else if not PixelData^.IsBackground and (PixelData^.Lightness > MaxFL) then
-        MaxFL := PixelData^.Lightness;
-
-      PixelData := PPixelData(NativeUInt(PixelData) + SizeOf(TPixelData));
-    end;
-
-    SetLength(Result, Width * Height * SizeOf(TRGBQUAD));
-
-    ColorToHLS(BackgroundColor, HB, LB, SB);
-    ColorToHLS(TextColor, HF, LF, SF);
-
-    PixelData := BitmapStart;
-    RGBQuad := @Result[0];
-    while PixelData < BitmapEnd do
-    begin
-      if PixelData^.IsBackground then
-        HLStoRGB(HB, Trunc(LB * ((255 - (MaxBL - PixelData^.Lightness)) / 255)), SB, RGBQuad^.rgbRed, RGBQuad^.rgbGreen, RGBQuad^.rgbBlue)
-      else
-        HLStoRGB(HF, Trunc(LF * ((255 - (MaxFL - PixelData^.Lightness)) / 255)), SF, RGBQuad^.rgbRed, RGBQuad^.rgbGreen, RGBQuad^.rgbBlue);
-
-      RGBQuad^.rgbReserved := PixelData.Alpha;
-
-      PixelData := PPixelData(NativeUInt(PixelData) + SizeOf(TPixelData));
-      RGBQuad := PRGBQUAD(NativeUInt(RGBQuad) + SizeOf(TRGBQUAD));
-    end;
-  end;
-
+function TWindow.CreateNotificationIcon: HICON;
 var
   DC, Bmp, Icon: HANDLE;
   BitmapStart: Pointer = nil;
   IconInfo: TIconInfo = (fIcon: False; xHotspot: 0; yHotspot: 0; hbmMask: 0; hbmColor: 0);
   BitmapHeader: BITMAPV5HEADER;
   BitmapInfo: BITMAP;
-  NOI: PNotificationOverlayInfo;
-  NotificationBitmap: TByteArray;
 begin
   if ExtractIconExW(PWideChar(UnicodeString(TPaths.ExePath)), 0, nil, @Icon, 1) <> 1 then
     raise Exception.Create('ExtractIconExW() failed');
@@ -718,286 +623,6 @@ begin
 
   SelectObject(DC, Bmp);
   DrawIconEx(DC, 0, 0, Icon, BitmapInfo.bmWidth, BitmapInfo.bmHeight, 0, 0, DI_NORMAL);
-
-  NOI := GetNotificationOverlay(UnreadCount);
-  if Assigned(NOI) then
-  begin
-    NotificationBitmap := BuildImage(NOI^.Data, Pointer(NativeUInt(NOI^.Data) + (NOI^.Width * NOI^.Height * SizeOf(TPixelData))), NOI^.Width, NOI^.Height, BackgroundColor, TextColor);
-    Draw(BitmapStart, @NotificationBitmap[0], BitmapInfo.bmWidth - NOI^.Width, BitmapInfo.bmHeight - NOI^.Height, BitmapInfo.bmWidth, NOI^.Width, NOI^.Height);
-  end;
-
-  IconInfo.fIcon := True;
-  IconInfo.xHotspot := 0;
-  IconInfo.yHotspot := 0;
-  IconInfo.hbmColor := Bmp;
-  IconInfo.hbmMask := Bmp;
-
-  Result := CreateIconIndirect(IconInfo);
-
-  DeleteDC(DC);
-  DeleteObject(Bmp);
-end;
-
-function TWindow.CreateNotificationIconDrawn(const UnreadCount: Integer; const BackgroundColor, TextColor: LongInt): HICON;
-
-type
-  TByteArray = array of Byte;
-
-  TTextDrawInfo = record
-    Font: HFONT;
-    LeftPadding, TopPadding: LongInt;
-    Width, Height: LongInt;
-  end;
-
-  function RGBToColor(R, G, B: Byte): LongInt;
-  begin
-    Result := (B shl 16) or (G shl 8) or R;
-  end;
-
-  function GetBitmapHeader(const Size: TSize): BITMAPV5HEADER;
-  begin
-    ZeroMemory(@Result, SizeOf(Result));
-    Result.bV5Size := SizeOf(Result);
-    Result.bV5Width := Size.Width;
-    Result.bV5Height := -Size.Height;
-    Result.bV5Planes := 1;
-    Result.bV5BitCount := 32;
-    Result.bV5Compression := BI_RGB;
-  end;
-
-  procedure UpdateAlpha(const BitmapStart: PRGBQUAD; const BitmapSize: TSize; const Alpha, NewAlpha: Byte);
-  var
-    RGBQuad: PRGBQUAD;
-  begin
-    RGBQuad := BitmapStart;
-    while RGBQuad < BitmapStart + BitmapSize.Width * BitmapSize.Height * SizeOf(TRGBQUAD) do
-    begin
-      if RGBQuad.rgbReserved = Alpha then
-        RGBQuad.rgbReserved := NewAlpha;
-
-      Inc(RGBQuad);
-    end;
-  end;
-
-  procedure AlphaDraw(const Dst, Src: PRGBQUAD; const DstPos: TPoint; const DstSize, SrcSize: TSize);
-  var
-    DstRgb, SrcRgb: PRGBQUAD;
-    OffsetX, Y, SrcCnt: LongInt;
-    Alpha: Byte;
-  begin
-    Y := DstPos.Y;
-
-    OffsetX := DstPos.X;
-
-    SrcRgb := Src;
-    DstRgb := (Dst + Y * DstSize.Width) + OffsetX;
-
-    SrcCnt := 0;
-    while SrcRgb < Src + SrcSize.Width * SrcSize.Height do
-    begin
-      Alpha := Trunc(SrcRgb.rgbReserved + (DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255));
-
-      if Alpha > 0 then
-      begin
-        DstRgb.rgbRed := Trunc((SrcRgb.rgbRed * SrcRgb.rgbReserved + DstRgb.rgbRed * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / Alpha);
-        DstRgb.rgbGreen := Trunc((SrcRgb.rgbGreen * SrcRgb.rgbReserved + DstRgb.rgbGreen * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / Alpha);
-        DstRgb.rgbBlue := Trunc((SrcRgb.rgbBlue * SrcRgb.rgbReserved + DstRgb.rgbBlue * DstRgb.rgbReserved * (255 - SrcRgb.rgbReserved) / 255) / Alpha);
-      end;
-
-      DstRgb.rgbReserved := Alpha;
-
-      Inc(SrcRgb);
-      Inc(SrcCnt);
-
-      if SrcCnt mod SrcSize.Width = 0 then
-      begin
-        Inc(Y);
-        DstRgb := (Dst + Y * DstSize.Width) + OffsetX;
-      end else
-        Inc(DstRgb);
-    end;
-  end;
-
-  function GetTextDrawInfo(const FontSize: Integer; const Text: string; var TextDrawInfo: TTextDrawInfo): Boolean;
-  var
-    R: RECT;
-    DC, Bmp, Brush, Font, FontOld: HANDLE;
-    BitmapHeader: BITMAPV5HEADER;
-    FHeight, X, Y: LongInt;
-    BitmapSize: TSize;
-    BitmapStart: PRGBQUAD = nil;
-    RGBQuad: PRGBQUAD;
-    TopLeft, BottomRight: TPoint;
-  begin
-    Result := False;
-
-    BitmapSize := TSize.Create(FontSize * 2, FontSize * 2);
-    BitmapHeader := GetBitmapHeader(BitmapSize);
-
-    DC := CreateCompatibleDC(0);
-    Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
-
-    SelectObject(DC, Bmp);
-
-    Brush := CreateSolidBrush(BackgroundColor);
-    FillRect(DC, TRect.Create(0, 0, BitmapSize.Width, BitmapSize.Height), Brush);
-    DeleteObject(Brush);
-
-    FHeight := -MulDiv(FontSize, GetDeviceCaps(DC, LOGPIXELSY), 72);
-
-    Font := CreateFont(FHeight, 0, 0, 0, FW_REGULAR, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, nil);
-    FontOld := SelectObject(DC, Font);
-
-    SetTextColor(DC, TextColor);
-    SetBkMode(DC, TRANSPARENT);
-
-    R := TRect.Create(0, 0, BitmapSize.Width, BitmapSize.Height);
-
-    DrawTextW(DC, PWideChar(UnicodeString(Text)), Text.Length, R, DT_TOP or DT_LEFT);
-
-    Font := SelectObject(DC, FontOld);
-
-    TopLeft := TPoint.Create(MAXWORD, MAXWORD);
-    BottomRight := TPoint.Create(0, 0);
-
-    RGBQuad := BitmapStart;
-    while RGBQuad < BitmapStart + BitmapSize.Width * BitmapSize.Height do
-    begin
-      if RGBToColor(RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue) <> BackgroundColor then
-      begin
-        X := (RGBQuad - BitmapStart) mod BitmapSize.Width;
-        Y := (RGBQuad - BitmapStart) div BitmapSize.Height;
-        if X < TopLeft.X then
-          TopLeft.X := X;
-        if Y < TopLeft.Y then
-          TopLeft.Y := Y;
-        if X > BottomRight.X then
-          BottomRight.X := X;
-        if Y > BottomRight.Y then
-          BottomRight.Y := Y;
-
-        Result := True;
-      end;
-      Inc(RGBQuad);
-    end;
-
-    TextDrawInfo.Font := Font;
-    TextDrawInfo.LeftPadding := TopLeft.X;
-    TextDrawInfo.TopPadding := TopLeft.Y;
-    TextDrawInfo.Width := BottomRight.X - TopLeft.X + 1;
-    TextDrawInfo.Height := BottomRight.Y - TopLeft.Y + 1;
-
-    DeleteDC(DC);
-    DeleteObject(Bmp);
-  end;
-
-  function DrawBadge(const Size: TSize; const TextDrawInfo: TTextDrawInfo; const Str: string): TByteArray;
-  var
-    FontOld: HFONT;
-    R: TRect;
-    DC, Bmp, Pen, PenOld, Brush, BrushOld: HANDLE;
-    BitmapStart: PRGBQUAD = nil;
-    BitmapHeader: BITMAPV5HEADER;
-  begin
-    Result := [];
-
-    DC := CreateCompatibleDC(0);
-
-    BitmapHeader := GetBitmapHeader(Size);
-    Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
-
-    SelectObject(DC, Bmp);
-
-    Brush := CreateSolidBrush(BackgroundColor);
-    FillRect(DC, TRect.Create(0, 0, Size.Width, Size.Height), Brush);
-    DeleteObject(Brush);
-
-    UpdateAlpha(BitmapStart, Size, $00, $FF);
-
-    Pen := CreatePen(PS_SOLID, 1, BackgroundColor);
-    PenOld := SelectObject(DC, Pen);
-
-    BrushOld := SelectObject(DC, GetStockObject(HOLLOW_BRUSH));
-    Rectangle(DC, 0, 0, Size.Width, Size.Height);
-    SelectObject(DC, BrushOld);
-
-    UpdateAlpha(BitmapStart, Size, $00, $AA);
-
-    Pen := SelectObject(DC, PenOld);
-    DeleteObject(Pen);
-
-    FontOld := SelectObject(DC, TextDrawInfo.Font);
-    SetTextColor(DC, TextColor);
-    SetBkMode(DC, TRANSPARENT);
-
-    R := TRect.Create(((Size.Width - TextDrawInfo.Width) div 2) - TextDrawInfo.LeftPadding, ((Size.Height - TextDrawInfo.Height) div 2) - TextDrawInfo.TopPadding, Size.Width, Size.Height);
-
-    DrawTextW(DC, PWideChar(UnicodeString(Str)), Str.Length, R, DT_TOP or DT_LEFT);
-
-    SelectObject(DC, FontOld);
-
-    UpdateAlpha(BitmapStart, Size, $00, $FF);
-
-    SetLength(Result, Size.Width * Size.Height * SizeOf(TRGBQUAD));
-    CopyMemory(@Result[0], BitmapStart, Length(Result));
-
-    DeleteDC(DC);
-    DeleteObject(Bmp);
-  end;
-
-const
-  BoxPaddingX = 1;
-  BoxPaddingY = 1;
-var
-  DC, Bmp, Icon: HANDLE;
-  Text: string;
-  BitmapStart: PRGBQUAD = nil;
-  BitmapHeader: BITMAPV5HEADER;
-  IconInfo: TICONINFO = (fIcon: False; xHotspot: 0; yHotspot: 0; hbmMask: 0; hbmColor: 0);
-  BitmapInfo: BITMAP;
-  BadgeBitmap: TByteArray;
-  BitmapSize, BoxSize: TSize;
-  BoxPos: TPoint;
-  TextDrawInfo: TTextDrawInfo = (Font: 0; LeftPadding: 0; TopPadding: 0; Width: 0; Height: 0);
-begin
-  if ExtractIconExW(PWideChar(UnicodeString(ParamStr(0))), 0, nil, @Icon, 1) <> 1 then
-    raise Exception.Create('ExtractIconExW() failed');
-
-  GetIconInfo(Icon, IconInfo);
-
-  GetObject(IconInfo.hbmColor, SizeOf(BitmapInfo), @BitmapInfo);
-
-  DeleteObject(IconInfo.hbmColor);
-  DeleteObject(IconInfo.hbmMask);
-
-  BitmapSize := TSize.Create(BitmapInfo.bmWidth, BitmapInfo.bmHeight);
-
-  DC := CreateCompatibleDC(0);
-
-  BitmapHeader := GetBitmapHeader(BitmapSize);
-  Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
-
-  SelectObject(DC, Bmp);
-
-  DrawIconEx(DC, 0, 0, Icon, BitmapSize.Width, BitmapSize.Height, 0, 0, DI_NORMAL);
-
-  if UnreadCount > 0 then
-  begin
-    Text := IfThen<string>(UnreadCount > 99, '!!!', UnreadCount.ToString);
-
-    if GetTextDrawInfo(Trunc(BitmapSize.Height * 0.45), Text, TextDrawInfo) then
-      try
-        BoxSize := TSize.Create(TextDrawInfo.Width + BoxPaddingX * 2, TextDrawInfo.Height + BoxPaddingY * 2);
-        BoxPos := TPoint.Create(BitmapSize.Width - BoxSize.Width, BitmapSize.Height - BoxSize.Height);
-
-        FillRect(DC, TRect.Create(BoxPos.X - 1, BoxPos.Y - 1, BitmapSize.Width, BitmapSize.Height), GetStockObject(WHITE_BRUSH));
-
-        BadgeBitmap := DrawBadge(BoxSize, TextDrawInfo, Text);
-        AlphaDraw(BitmapStart, @BadgeBitmap[0], BoxPos, BitmapSize, BoxSize);
-      finally
-        DeleteObject(TextDrawInfo.Font);
-      end;
-  end;
 
   IconInfo.fIcon := True;
   IconInfo.xHotspot := 0;

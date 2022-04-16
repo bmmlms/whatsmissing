@@ -16,7 +16,6 @@ const
   WM_CHECK_LINKS = WM_SHARED + 5;
 
   // WhatsApp window messages
-  WM_CHAT = WM_SHARED + 10;
   WM_ACTIVATE_INSTANCE = WM_SHARED + 11;
 
   // Shared window messages
