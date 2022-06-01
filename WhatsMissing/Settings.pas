@@ -302,7 +302,7 @@ begin
     ColorSetting.Free;
   FColorSettings.Clear;
 
-  FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter').UpdateInFile('svg.*.js')]));
+  FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter').UpdateInFile('svg.*.js').UpdateAllColors]));
 
   FColorSettings.Add(TColorSettingResource.Create(18, 'Startup background', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--startup-background'),
     TColorSettingResourcePatch.Create('--startup-background-rgb').RGB,
