@@ -402,7 +402,7 @@ begin
 
           FLog.Debug('Found notification sound query');
 
-          if FMMFLauncher.SuppressConsecutiveNotificationSounds then
+          if FMMFLauncher.SuppressConsecutiveNotifications then
           begin
             Chat := FMMFLauncher.Chats.Get(JSONData.Value);
 

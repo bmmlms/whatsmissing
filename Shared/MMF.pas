@@ -123,7 +123,7 @@ type
     FAlwaysOnTop: Boolean;
     FSuppressPresenceAvailable: Boolean;
     FSuppressPresenceComposing: Boolean;
-    FSuppressConsecutiveNotificationSounds: Boolean;
+    FSuppressConsecutiveNotifications: Boolean;
   protected
     procedure ReadStream(const MS: TMemoryStream); override;
     procedure WriteStream(const MS: TMemoryStream); override;
@@ -157,7 +157,7 @@ type
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
     property SuppressPresenceAvailable: Boolean read FSuppressPresenceAvailable write FSuppressPresenceAvailable;
     property SuppressPresenceComposing: Boolean read FSuppressPresenceComposing write FSuppressPresenceComposing;
-    property SuppressConsecutiveNotificationSounds: Boolean read FSuppressConsecutiveNotificationSounds write FSuppressConsecutiveNotificationSounds;
+    property SuppressConsecutiveNotifications: Boolean read FSuppressConsecutiveNotifications write FSuppressConsecutiveNotifications;
   end;
 
   { TMMFSettings }
@@ -588,7 +588,7 @@ begin
 
   FSuppressPresenceAvailable := Boolean(MS.ReadByte);
   FSuppressPresenceComposing := Boolean(MS.ReadByte);
-  FSuppressConsecutiveNotificationSounds := Boolean(MS.ReadByte);
+  FSuppressConsecutiveNotifications := Boolean(MS.ReadByte);
 end;
 
 procedure TMMFLauncher.WriteStream(const MS: TMemoryStream);
@@ -627,7 +627,7 @@ begin
   MS.WriteByte(Byte(FAlwaysOnTop));
   MS.WriteByte(Byte(FSuppressPresenceAvailable));
   MS.WriteByte(Byte(FSuppressPresenceComposing));
-  MS.WriteByte(Byte(FSuppressConsecutiveNotificationSounds));
+  MS.WriteByte(Byte(FSuppressConsecutiveNotifications));
 end;
 
 { TMMFSettings }
