@@ -121,7 +121,7 @@ type
     FUseRegularTitleBar: Boolean;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
-    FSuppressConsecutiveNotificationSounds: Boolean;
+    FSuppressConsecutiveNotifications: Boolean;
 
     procedure Reset;
     function FGetResourceSettingsChecksum: UInt16;
@@ -146,7 +146,7 @@ type
     property UseRegularTitleBar: Boolean read FUseRegularTitleBar write FUseRegularTitleBar;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
-    property SuppressConsecutiveNotificationSounds: Boolean read FSuppressConsecutiveNotificationSounds write FSuppressConsecutiveNotificationSounds;
+    property SuppressConsecutiveNotifications: Boolean read FSuppressConsecutiveNotifications write FSuppressConsecutiveNotifications;
   end;
 
 implementation
@@ -201,7 +201,7 @@ begin
         FUseRegularTitleBar := JSONObject.Get('UseRegularTitleBar', FUseRegularTitleBar);
         FHideMaximize := JSONObject.Get('HideMaximize', FHideMaximize);
         FAlwaysOnTop := JSONObject.Get('AlwaysOnTop', FAlwaysOnTop);
-        FSuppressConsecutiveNotificationSounds := JSONObject.Get('SuppressConsecutiveNotificationSounds', FSuppressConsecutiveNotificationSounds);
+        FSuppressConsecutiveNotifications := JSONObject.Get('SuppressConsecutiveNotifications', FSuppressConsecutiveNotifications);
 
         JSONArray := JSONObject.Get('ResourcePatches', TJSONArray(nil));
 
@@ -253,7 +253,7 @@ begin
     JSONObject.Add('UseRegularTitleBar', FUseRegularTitleBar);
     JSONObject.Add('HideMaximize', FHideMaximize);
     JSONObject.Add('AlwaysOnTop', FAlwaysOnTop);
-    JSONObject.Add('SuppressConsecutiveNotificationSounds', FSuppressConsecutiveNotificationSounds);
+    JSONObject.Add('SuppressConsecutiveNotifications', FSuppressConsecutiveNotifications);
 
     JSONArray := TJSONArray.Create;
     JSONObject.Add('ResourcePatches', JSONArray);
@@ -291,7 +291,7 @@ begin
   MMF.UseRegularTitleBar := FUseRegularTitleBar;
   MMF.HideMaximize := FHideMaximize;
   MMF.AlwaysOnTop := FAlwaysOnTop;
-  MMF.SuppressConsecutiveNotificationSounds := FSuppressConsecutiveNotificationSounds;
+  MMF.SuppressConsecutiveNotifications := FSuppressConsecutiveNotifications;
 end;
 
 procedure TSettings.Reset;
@@ -375,7 +375,7 @@ begin
   FUseRegularTitleBar := False;
   FHideMaximize := False;
   FAlwaysOnTop := False;
-  FSuppressConsecutiveNotificationSounds := True;
+  FSuppressConsecutiveNotifications := True;
 end;
 
 function TSettings.FGetResourceSettingsChecksum: UInt16;

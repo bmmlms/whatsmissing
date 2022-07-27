@@ -144,8 +144,8 @@ const
   AddCursorDefault: array[0..2] of string = ('#windows-title-minimize', '#windows-title-maximize', '#windows-title-close');
 
   JsRegExReplacements: array[0..0] of TRegExReplace = (
-    (FilePattern: ['bootstrap_main.*.js']; Search: '(.)\.MuteCollection\.getGlobalSounds\(\)&&\((.)\.id'; Replace: 'window.wmcall("ask_notification_sound", $2.id) &&$1.MuteCollection.getGlobalSounds()&&($2.id'));
-
+    (FilePattern: ['bootstrap_main.*.js']; Search: 'var (.)\=this\.msg\.chat;return!!(.)\.MuteCollection\.globalMute\(\)\.isMuted';
+     Replace: 'var $1=this.msg.chat; return !window.wmcall("ask_notification_sound", $1.__x_id._serialized) || !!$2.MuteCollection.globalMute().isMuted'));
 var
   Asar: TASAR;
   AsarEntry: TASAREntry;
@@ -204,8 +204,8 @@ begin
   try
     Asar.Read(Filename);
 
-    // Patch preload.js
-    AsarFile := TASARFile(Asar.Root.FindEntry('preload.js', TASARFile));
+    // Patch WAWebElectronPreload.js
+    AsarFile := TASARFile(Asar.Root.FindEntry('WAWebElectronPreload.js', TASARFile));
     if Assigned(AsarFile) then
     begin
       FileInfo := NewFileInfo(AsarFile, nil, PreloadJsPatch + AsarFile.Contents.AsString);

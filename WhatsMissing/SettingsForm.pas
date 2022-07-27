@@ -81,7 +81,7 @@ type
     btnSave: TBitBtn;
     chkUseSquaredProfileImages: TCheckBox;
     chkUseRegularTitleBar: TCheckBox;
-    chkSuppressConsecutiveNotificationSounds: TCheckBox;
+    chkSuppressConsecutiveNotifications: TCheckBox;
     chkHideMaximize: TCheckBox;
     chkShowNotificationIcon: TCheckBox;
     chkRemoveRoundedElementCorners: TCheckBox;
@@ -151,7 +151,7 @@ begin
   chkUseSquaredProfileImages.Checked := FSettings.UseSquaredProfileImages;
   chkUseRegularTitleBar.Checked := FSettings.UseRegularTitleBar;
   chkHideMaximize.Checked := FSettings.HideMaximize;
-  chkSuppressConsecutiveNotificationSounds.Checked := FSettings.SuppressConsecutiveNotificationSounds;
+  chkSuppressConsecutiveNotifications.Checked := FSettings.SuppressConsecutiveNotifications;
 
   MMFLauncher := TMMFLauncher.Create(False);
   try
@@ -251,7 +251,7 @@ begin
     SaveSettings.UseSquaredProfileImages := chkUseSquaredProfileImages.Checked;
     SaveSettings.UseRegularTitleBar := chkUseRegularTitleBar.Checked;
     SaveSettings.HideMaximize := chkHideMaximize.Checked;
-    SaveSettings.SuppressConsecutiveNotificationSounds := chkSuppressConsecutiveNotificationSounds.Checked;
+    SaveSettings.SuppressConsecutiveNotifications := chkSuppressConsecutiveNotifications.Checked;
 
     try
       SaveSettings.Save;
