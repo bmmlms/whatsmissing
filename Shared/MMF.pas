@@ -458,9 +458,9 @@ begin
     for Chat in Chats do
     begin
       if Chat.SetUnread or (Chat.UnreadMessages = 1) then
-        Line := #13#10'  %s'.Format([Chat.Name])
+        Line := #13#10'  %s'.Format([Chat.Name.Replace('&', '&&&', [rfReplaceAll])])
       else if Chat.UnreadMessages > 1 then
-        Line := #13#10'  %s (%d)'.Format([Chat.Name, Chat.UnreadMessages]);
+        Line := #13#10'  %s (%d)'.Format([Chat.Name.Replace('&', '&&&', [rfReplaceAll]), Chat.UnreadMessages]);
 
       if ToolTip.Length + Line.Length + TailMultiple.Length + 2 < MaxToolTipLen then
       begin
