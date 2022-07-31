@@ -11,7 +11,7 @@ uses
   Window,
   Windows;
 
-{ R *.res}
+{$R *.res}
 
 var
   MMFLauncher: TMMFLauncher;
@@ -122,8 +122,6 @@ begin
   if Assigned(Log) then
     Log.Free;
 end;
-
-{$R *.res}
 
 begin
   IsMultiThread := True;

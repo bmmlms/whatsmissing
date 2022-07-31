@@ -17,7 +17,6 @@ uses
   Windows;
 
 {$R *.res}
-{$R resources.rc}
 
 procedure RunInject;
 var

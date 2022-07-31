@@ -16,7 +16,8 @@ uses
   RegExpr,
   Settings,
   StrUtils,
-  SysUtils;
+  SysUtils,
+  Windows;
 
 type
 
@@ -136,16 +137,16 @@ type
   end;
 
 const
-  PreloadJsPatch: AnsiString = '(function() { var fs = require("fs"); var h = fs.openSync("\\\\.\\wacommunication", "w+"); window.wmcall = function(method, data) ' +
-    '{ var b = Buffer.alloc(1024); fs.writeSync(h, JSON.stringify({ method: method, data: data })); fs.readSync(h, b, 0, 1024, 0); return JSON.parse(b.toString()); }; }());';
-
   SetOpacityOne: array[0..2] of string = ('#windows-title-minimize.blurred', '#windows-title-maximize.blurred', '#windows-title-close.blurred');
 
   AddCursorDefault: array[0..2] of string = ('#windows-title-minimize', '#windows-title-maximize', '#windows-title-close');
 
-  JsRegExReplacements: array[0..0] of TRegExReplace = (
-    (FilePattern: ['bootstrap_main.*.js']; Search: 'var (.)\=this\.msg\.chat;return!!(.)\.MuteCollection\.globalMute\(\)\.isMuted';
-     Replace: 'var $1=this.msg.chat; return !window.wmcall("ask_notification_sound", $1.__x_id._serialized) || !!$2.MuteCollection.globalMute().isMuted'));
+  JsRegExReplacements: array[0..2] of TRegExReplace = (
+    (FilePattern: ['bootstrap_main.*.js']; Search: 'var (.)=this\.msg\.chat;return!!(.)\.MuteCollection\.globalMute\(\)\.isMuted';
+      Replace: 'var $1=this.msg.chat; return !window.__wm_call("ask_notification", $1.__x_id._serialized) || !!$2.MuteCollection.globalMute().isMuted'),
+    (FilePattern: ['bootstrap_main.*.js']; Search: 'case (.)\.StreamInfo\.NORMAL:'; Replace: 'case $1.StreamInfo.NORMAL:window.__wm_start();'),
+    (FilePattern: ['bootstrap_main.*.js']; Search: 'case (.)\.StreamInfo\.OFFLINE:'; Replace: 'case $1.StreamInfo.OFFLINE:window.__wm_stop();')
+  );
 var
   Asar: TASAR;
   AsarEntry: TASAREntry;
@@ -162,12 +163,12 @@ var
   StrLen: Integer;
   FileInfos: TList<PFileInfo>;
   ReplaceCount, PatchReplaceCount: Integer;
-  OriginalColorHtml, NewColor, Selector: string;
+  OriginalColorHtml, NewColor, Selector, Wild, PreloadPatch: string;
   OriginalColor: TColor;
   Stream: TMemoryStream;
+  ResStream: TResourceStream;
   RegEx: TRegExpr;
   Found: Boolean;
-  Wild: string;
   Wilds: TList<string>;
   OriginalClassesToColors: TDictionary<string, string>;
   OriginalColorToColors: TDictionary<string, string>;
@@ -208,12 +209,21 @@ begin
     AsarFile := TASARFile(Asar.Root.FindEntry('WAWebElectronPreload.js', TASARFile));
     if Assigned(AsarFile) then
     begin
-      FileInfo := NewFileInfo(AsarFile, nil, PreloadJsPatch + AsarFile.Contents.AsString);
+      ResStream := TResourceStream.Create(HINSTANCE, 'PATCH_WAWEBELECTRONPRELOAD', RT_RCDATA);
+      try
+        SetLength(PreloadPatch, ResStream.Size);
+        ResStream.Read(PreloadPatch[1], ResStream.Size);
+      finally
+        ResStream.Free;
+      end;
+
+      FileInfo := NewFileInfo(AsarFile, nil, PreloadPatch + AsarFile.Contents.AsString);
+
       FileInfo.Modified := True;
       FileInfos.Add(FileInfo);
     end else
     begin
-      FLog.Error('"preload.js" could not be found');
+      FLog.Error('"WAWebElectronPreload.js" could not be found');
       FJsError := True;
     end;
 

@@ -49,19 +49,19 @@ type
 
   TChat = class
   private
-    FJID: string;
+    FID: string;
     FName: string;
     FMute: Cardinal;
     FSetUnread: Boolean;
     FUnreadMessages: UInt16;
     FLastCommunication: Cardinal;
-    FLastNotificationSound: Cardinal;
+    FLastNotification: Cardinal;
 
     procedure FSetName(const Value: string);
     function FGetMuted: Boolean;
   public
-    constructor Create(const JID: string); overload;
-    constructor Create(const JID, Name: string; const Mute: Cardinal; const SetUnread: Boolean; const UnreadMessages: UInt16; const T: Cardinal; const LastMessageReceived: Cardinal); overload;
+    constructor Create(const ID: string); overload;
+    constructor Create(const ID, Name: string; const Mute: Cardinal; const SetUnread: Boolean; const UnreadMessages: UInt16; const T: Cardinal; const LastMessageReceived: Cardinal); overload;
 
     procedure ReadStream(const MS: TMemoryStream);
     procedure WriteStream(const MS: TMemoryStream);
@@ -72,13 +72,13 @@ type
 
     function ToString: string; override;
 
-    property JID: string read FJID;
+    property ID: string read FID;
     property Name: string read FName write FSetName;
     property Muted: Boolean read FGetMuted;
     property SetUnread: Boolean read FSetUnread;
     property UnreadMessages: UInt16 read FUnreadMessages;
     property LastCommunication: Cardinal read FLastCommunication write FLastCommunication;
-    property LastNotificationSound: Cardinal read FLastNotificationSound write FLastNotificationSound;
+    property LastNotification: Cardinal read FLastNotification write FLastNotification;
   end;
 
   { TChatList }
@@ -89,7 +89,7 @@ type
 
     procedure Clear; override;
 
-    function Get(const JID: string): TChat;
+    function Get(const ID: string): TChat;
     procedure GetUnreadChats(const MaxAgeDays: Integer; const MaxToolTipLen: Integer; const ExcludeMuted: Boolean; out ChatCount: Integer; out ToolTip: string);
 
     procedure ReadStream(const MS: TMemoryStream);
@@ -121,8 +121,6 @@ type
     FUseRegularTitleBar: Boolean;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
-    FSuppressPresenceAvailable: Boolean;
-    FSuppressPresenceComposing: Boolean;
     FSuppressConsecutiveNotifications: Boolean;
   protected
     procedure ReadStream(const MS: TMemoryStream); override;
@@ -155,8 +153,6 @@ type
     property UseRegularTitleBar: Boolean read FUseRegularTitleBar write FUseRegularTitleBar;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
-    property SuppressPresenceAvailable: Boolean read FSuppressPresenceAvailable write FSuppressPresenceAvailable;
-    property SuppressPresenceComposing: Boolean read FSuppressPresenceComposing write FSuppressPresenceComposing;
     property SuppressConsecutiveNotifications: Boolean read FSuppressConsecutiveNotifications write FSuppressConsecutiveNotifications;
   end;
 
@@ -318,20 +314,20 @@ end;
 
 { TChat }
 
-constructor TChat.Create(const JID: string);
+constructor TChat.Create(const ID: string);
 begin
-  FJID := JID;
+  FID := ID;
 end;
 
-constructor TChat.Create(const JID, Name: string; const Mute: Cardinal; const SetUnread: Boolean; const UnreadMessages: UInt16; const T: Cardinal; const LastMessageReceived: Cardinal);
+constructor TChat.Create(const ID, Name: string; const Mute: Cardinal; const SetUnread: Boolean; const UnreadMessages: UInt16; const T: Cardinal; const LastMessageReceived: Cardinal);
 begin
-  FJID := JID;
+  FID := ID;
   FSetName(Name);
   FMute := Mute;
   FSetUnread := SetUnread;
   FUnreadMessages := UnreadMessages;
   FLastCommunication := T;
-  FLastNotificationSound := LastMessageReceived;
+  FLastNotification := LastMessageReceived;
 end;
 
 procedure TChat.FSetName(const Value: string);
@@ -346,24 +342,24 @@ end;
 
 procedure TChat.ReadStream(const MS: TMemoryStream);
 begin
-  FJID := MS.ReadAnsiString;
+  FID := MS.ReadAnsiString;
   FName := MS.ReadAnsiString;
   FMute := MS.ReadDWord;
   FSetUnread := Boolean(MS.ReadByte);
   FUnreadMessages := MS.ReadWord;
   FLastCommunication := MS.ReadDWord;
-  FLastNotificationSound := MS.ReadDWord;
+  FLastNotification := MS.ReadDWord;
 end;
 
 procedure TChat.WriteStream(const MS: TMemoryStream);
 begin
-  MS.WriteAnsiString(FJID);
+  MS.WriteAnsiString(FID);
   MS.WriteAnsiString(FName);
   MS.WriteDWord(FMute);
   MS.WriteByte(Byte(FSetUnread));
   MS.WriteWord(FUnreadMessages);
   MS.WriteDWord(FLastCommunication);
-  MS.WriteDWord(FLastNotificationSound);
+  MS.WriteDWord(FLastNotification);
 end;
 
 procedure TChat.UpdateLastCommunication;
@@ -384,8 +380,8 @@ end;
 
 function TChat.ToString: string;
 begin
-  Result := 'JID %s, Name "%s", Muted %s, MuteExpires %d, SetUnread %s, UnreadMessages %d, T %d, LastMessageReceived %d'
-    .Format([FJID, FName, IfThen<string>(FGetMuted, 'True', 'False'), FMute, IfThen<string>(FSetUnread, 'True', 'False'), FUnreadMessages, FLastCommunication, FLastNotificationSound]);
+  Result := 'ID %s, Name "%s", Muted %s, MuteExpires %d, SetUnread %s, UnreadMessages %d, LastCommunication %d, LastNotification %d'
+    .Format([FID, FName, IfThen<string>(FGetMuted, 'True', 'False'), FMute, IfThen<string>(FSetUnread, 'True', 'False'), FUnreadMessages, FLastCommunication, FLastNotification]);
 end;
 
 { TChatList }
@@ -407,19 +403,19 @@ begin
   inherited;
 end;
 
-function TChatList.Get(const JID: string): TChat;
+function TChatList.Get(const ID: string): TChat;
 var
   Chat: TChat;
 begin
-  if Trim(JID).Length = 0 then
-    raise Exception.Create('Trim(JID).Length = 0');
+  if Trim(ID).Length = 0 then
+    raise Exception.Create('Trim(ID).Length = 0');
 
-  if TryGetValue(JID, Chat) then
+  if TryGetValue(ID, Chat) then
     Exit(Chat);
 
-  Result := TChat.Create(JID);
+  Result := TChat.Create(ID);
 
-  Add(JID, Result);
+  Add(ID, Result);
 end;
 
 function SortChats(A, B: Pointer): LongInt; register;
@@ -429,7 +425,8 @@ end;
 
 procedure TChatList.GetUnreadChats(const MaxAgeDays: Integer; const MaxToolTipLen: Integer; const ExcludeMuted: Boolean; out ChatCount: Integer; out ToolTip: string);
 const
-  Tail = #13#10'  +%d chat(s)';
+  TailOne = #13#10'  +1 chat';
+  TailMultiple = #13#10'  +%d chats';
 var
   MessageCount, ProcessedMessages, ProcessedChats: Integer;
   Line: string;
@@ -443,7 +440,7 @@ begin
   Chats := TList.Create;
   try
     for Chat in Self.Values do
-      if (Chat.JID <> 'status@broadcast') and
+      if (Chat.ID <> 'status') and
          (Chat.LastCommunication > DateTimeToUnix(DateUtils.IncDay(Now, -MaxAgeDays), False)) and
          (Chat.SetUnread or (Chat.UnreadMessages > 0)) and
          (not (Chat.Muted and ExcludeMuted)) then
@@ -465,14 +462,14 @@ begin
       else if Chat.UnreadMessages > 1 then
         Line := #13#10'  %s (%d)'.Format([Chat.Name, Chat.UnreadMessages]);
 
-      if ToolTip.Length + Line.Length + Tail.Length + 2 < MaxToolTipLen then
+      if ToolTip.Length + Line.Length + TailMultiple.Length + 2 < MaxToolTipLen then
       begin
         ProcessedChats += 1;
         ProcessedMessages += IfThen<Integer>(Chat.SetUnread, 1, Chat.UnreadMessages);
         ToolTip += Line;
       end else
       begin
-        ToolTip += Tail.Format([ChatCount - ProcessedChats]);
+        ToolTip += IfThen<string>(ChatCount - ProcessedChats = 1, TailOne, TailMultiple.Format([ChatCount - ProcessedChats]));
         Break;
       end;
     end;
@@ -494,7 +491,7 @@ begin
   begin
     Chat := TChat.Create;
     Chat.ReadStream(MS);
-    Add(Chat.JID, Chat);
+    Add(Chat.ID, Chat);
   end;
 end;
 
@@ -586,8 +583,6 @@ begin
   FHideMaximize := Boolean(MS.ReadByte);
   FAlwaysOnTop := Boolean(MS.ReadByte);
 
-  FSuppressPresenceAvailable := Boolean(MS.ReadByte);
-  FSuppressPresenceComposing := Boolean(MS.ReadByte);
   FSuppressConsecutiveNotifications := Boolean(MS.ReadByte);
 end;
 
@@ -625,8 +620,6 @@ begin
   MS.WriteByte(Byte(FUseRegularTitleBar));
   MS.WriteByte(Byte(FHideMaximize));
   MS.WriteByte(Byte(FAlwaysOnTop));
-  MS.WriteByte(Byte(FSuppressPresenceAvailable));
-  MS.WriteByte(Byte(FSuppressPresenceComposing));
   MS.WriteByte(Byte(FSuppressConsecutiveNotifications));
 end;
 

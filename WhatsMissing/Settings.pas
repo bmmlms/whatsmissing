@@ -114,13 +114,20 @@ type
     FLastUsedWhatsAppHash: Integer;
 
     FColorSettings: TList<TColorSettingBase>;
+    FNotificationIconBadgeColor: TColorSettingSimple;
+    FNotificationIconBadgeTextColor: TColorSettingSimple;
 
     FShowNotificationIcon: Boolean;
+    FShowUnreadMessagesBadge: Boolean;
+    FUsePreRenderedOverlays: Boolean;
+    FExcludeUnreadMessagesMutedChats: Boolean;
     FRemoveRoundedElementCorners: Boolean;
     FUseSquaredProfileImages: Boolean;
     FUseRegularTitleBar: Boolean;
     FHideMaximize: Boolean;
     FAlwaysOnTop: Boolean;
+    FSuppressPresenceAvailable: Boolean;
+    FSuppressPresenceComposing: Boolean;
     FSuppressConsecutiveNotifications: Boolean;
 
     procedure Reset;
@@ -141,11 +148,16 @@ type
     property ColorSettings: TList<TColorSettingBase> read FColorSettings;
 
     property ShowNotificationIcon: Boolean read FShowNotificationIcon write FShowNotificationIcon;
+    property ShowUnreadMessagesBadge: Boolean read FShowUnreadMessagesBadge write FShowUnreadMessagesBadge;
+    property UsePreRenderedOverlays: Boolean read FUsePreRenderedOverlays write FUsePreRenderedOverlays;
+    property ExcludeUnreadMessagesMutedChats: Boolean read FExcludeUnreadMessagesMutedChats write FExcludeUnreadMessagesMutedChats;
     property RemoveRoundedElementCorners: Boolean read FRemoveRoundedElementCorners write FRemoveRoundedElementCorners;
     property UseSquaredProfileImages: Boolean read FUseSquaredProfileImages write FUseSquaredProfileImages;
     property UseRegularTitleBar: Boolean read FUseRegularTitleBar write FUseRegularTitleBar;
     property HideMaximize: Boolean read FHideMaximize write FHideMaximize;
     property AlwaysOnTop: Boolean read FAlwaysOnTop write FAlwaysOnTop;
+    property SuppressPresenceAvailable: Boolean read FSuppressPresenceAvailable write FSuppressPresenceAvailable;
+    property SuppressPresenceComposing: Boolean read FSuppressPresenceComposing write FSuppressPresenceComposing;
     property SuppressConsecutiveNotifications: Boolean read FSuppressConsecutiveNotifications write FSuppressConsecutiveNotifications;
   end;
 
@@ -196,11 +208,16 @@ begin
       try
         FLastUsedWhatsAppHash := JSONObject.Get('LastUsedWhatsAppHash', FLastUsedWhatsAppHash);
         FShowNotificationIcon := JSONObject.Get('ShowNotificationIcon', FShowNotificationIcon);
+        FShowUnreadMessagesBadge := JSONObject.Get('ShowUnreadMessagesBadge', FShowUnreadMessagesBadge);
         FRemoveRoundedElementCorners := JSONObject.Get('RemoveRoundedElementCorners', FRemoveRoundedElementCorners);
         FUseSquaredProfileImages := JSONObject.Get('UseSquaredProfileImages', FUseSquaredProfileImages);
+        FUsePreRenderedOverlays := JSONObject.Get('UsePreRenderedOverlays', FUsePreRenderedOverlays);
+        FExcludeUnreadMessagesMutedChats := JSONObject.Get('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
         FUseRegularTitleBar := JSONObject.Get('UseRegularTitleBar', FUseRegularTitleBar);
         FHideMaximize := JSONObject.Get('HideMaximize', FHideMaximize);
         FAlwaysOnTop := JSONObject.Get('AlwaysOnTop', FAlwaysOnTop);
+        FSuppressPresenceAvailable := JSONObject.Get('SuppressPresenceAvailable', FSuppressPresenceAvailable);
+        FSuppressPresenceComposing := JSONObject.Get('SuppressPresenceComposing', FSuppressPresenceComposing);
         FSuppressConsecutiveNotifications := JSONObject.Get('SuppressConsecutiveNotifications', FSuppressConsecutiveNotifications);
 
         JSONArray := JSONObject.Get('ResourcePatches', TJSONArray(nil));
@@ -248,11 +265,16 @@ begin
   try
     JSONObject.Add('LastUsedWhatsAppHash', FLastUsedWhatsAppHash);
     JSONObject.Add('ShowNotificationIcon', FShowNotificationIcon);
+    JSONObject.Add('ShowUnreadMessagesBadge', FShowUnreadMessagesBadge);
+    JSONObject.Add('UsePreRenderedOverlays', FUsePreRenderedOverlays);
+    JSONObject.Add('ExcludeUnreadMessagesMutedChats', FExcludeUnreadMessagesMutedChats);
     JSONObject.Add('RemoveRoundedElementCorners', FRemoveRoundedElementCorners);
     JSONObject.Add('UseSquaredProfileImages', FUseSquaredProfileImages);
     JSONObject.Add('UseRegularTitleBar', FUseRegularTitleBar);
     JSONObject.Add('HideMaximize', FHideMaximize);
     JSONObject.Add('AlwaysOnTop', FAlwaysOnTop);
+    JSONObject.Add('SuppressPresenceAvailable', FSuppressPresenceAvailable);
+    JSONObject.Add('SuppressPresenceComposing', FSuppressPresenceComposing);
     JSONObject.Add('SuppressConsecutiveNotifications', FSuppressConsecutiveNotifications);
 
     JSONArray := TJSONArray.Create;
@@ -288,6 +310,11 @@ end;
 procedure TSettings.CopyToMMF(MMF: TMMFLauncher);
 begin
   MMF.ShowNotificationIcon := FShowNotificationIcon;
+  MMF.ShowUnreadMessagesBadge := FShowUnreadMessagesBadge;
+  MMF.UsePreRenderedOverlays := FUsePreRenderedOverlays;
+  MMF.ExcludeUnreadMessagesMutedChats := FExcludeUnreadMessagesMutedChats;
+  MMF.NotificationIconBadgeColor := ColorToRGB(FNotificationIconBadgeColor.GetColor(caNone));
+  MMF.NotificationIconBadgeTextColor := ColorToRGB(FNotificationIconBadgeTextColor.GetColor(caNone));
   MMF.UseRegularTitleBar := FUseRegularTitleBar;
   MMF.HideMaximize := FHideMaximize;
   MMF.AlwaysOnTop := FAlwaysOnTop;
@@ -302,8 +329,15 @@ begin
     ColorSetting.Free;
   FColorSettings.Clear;
 
+  FNotificationIconBadgeColor := TColorSettingSimple.Create(500, 'Notification icon badge', ImmersiveLightWUError);
+
+  FNotificationIconBadgeTextColor := TColorSettingSimple.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted);
+
   FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter').UpdateInFile('svg.*.js').UpdateAllColors]));
 
+  FColorSettings.Add(FNotificationIconBadgeColor);
+
+  FColorSettings.Add(FNotificationIconBadgeTextColor);
   FColorSettings.Add(TColorSettingResource.Create(18, 'Startup background', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--startup-background'),
     TColorSettingResourcePatch.Create('--startup-background-rgb').RGB,
     TColorSettingResourcePatch.Create('--startup-icon')]));
@@ -370,11 +404,16 @@ begin
     [TColorSettingResourcePatch.Create('html[dir] #windows-title-close:hover', 'background-color')]));
 
   FShowNotificationIcon := True;
+  FShowUnreadMessagesBadge := True;
+  FUsePreRenderedOverlays := True;
+  FExcludeUnreadMessagesMutedChats := False;
   FRemoveRoundedElementCorners := False;
   FUseSquaredProfileImages := False;
   FUseRegularTitleBar := False;
   FHideMaximize := False;
   FAlwaysOnTop := False;
+  FSuppressPresenceAvailable := False;
+  FSuppressPresenceComposing := False;
   FSuppressConsecutiveNotifications := True;
 end;
 

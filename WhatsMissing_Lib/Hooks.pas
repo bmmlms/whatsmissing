@@ -369,8 +369,9 @@ end;
 
 class function THooks.HWriteFile(hFile: HANDLE; lpBuffer: LPVOID; nNumberOfBytesToWrite: DWORD; lpNumberOfBytesWritten: PDWORD; lpOverlapped: POverlapped): BOOL; stdcall;
 var
-  JSONObject: TJSONObject;
+  JSONObject, JSONObjectChat: TJSONObject;
   JSONData: TJSONData;
+  JSONEnum: TJSONEnum;
   Chat: TChat;
   JSON: TMemoryStream;
 begin
@@ -378,6 +379,9 @@ begin
   begin
     if Assigned(FWAMethodResult) then
       raise Exception.Create('Assigned(FWAMethodResult)');
+
+    // Required to refresh chat list/WhatsAppWindowHandle
+    FMMFLauncher.Read;
 
     EnterCriticalSection(FCommunicationLock);
 
@@ -395,22 +399,65 @@ begin
         raise Exception.Create('Received invalid data');
 
       try
-        if JSONObject.Strings['method'] = 'ask_notification_sound' then
+        if JSONObject.Strings['method'] = 'chat_list_update' then
+        begin
+          FLog.Debug('Received chat_list_update');
+
+          for JSONEnum in TJSONArray(JSONData) do
+          begin
+            JSONObjectChat := TJSONObject(JSONEnum.Value);
+
+            Chat := FMMFLauncher.Chats.Get(JSONObjectChat.Strings['id']);
+
+            Chat.SetMute(JSONObjectChat.Integers['muteExpiration']);
+            Chat.SetUnreadMessages(JSONObjectChat.Integers['unreadCount'] = -1, IfThen<UInt16>(JSONObjectChat.Integers['unreadCount'] > 0, JSONObjectChat.Integers['unreadCount'], 0));
+            Chat.Name := JSONObjectChat.Strings['name'];
+            Chat.LastCommunication := JSONObjectChat.Integers['lastCommunication'];
+
+            FLog.Debug('  Updated chat: %s'.Format([Chat.ToString]));
+          end;
+
+          FMMFLauncher.Write;
+
+          PostMessage(FMMFLauncher.WhatsAppWindowHandle, WM_CHATS_CHANGED, 0, 0);
+        end else if JSONObject.Strings['method'] = 'chat_list_remove' then
+        begin
+          FLog.Debug('Received chat_list_remove');
+
+          for JSONEnum in TJSONArray(JSONData) do
+          begin
+            FMMFLauncher.Chats.Remove(TJSONString(JSONEnum.Value).AsString);
+
+            FLog.Debug('  Removed chat: %s'.Format([TJSONString(JSONEnum.Value).AsString]));
+          end;
+
+          FMMFLauncher.Write;
+
+          PostMessage(FMMFLauncher.WhatsAppWindowHandle, WM_CHATS_CHANGED, 0, 0);
+        end else if JSONObject.Strings['method'] = 'chat_list_clear' then
+        begin
+          FLog.Debug('Received chat_list_clear');
+
+          FMMFLauncher.Chats.Clear;
+
+          FMMFLauncher.Write;
+
+          PostMessage(FMMFLauncher.WhatsAppWindowHandle, WM_CHATS_CHANGED, 0, 0);
+        end else if JSONObject.Strings['method'] = 'ask_notification' then
         begin
           // WhatsApp is about to play the notification sound for a received message
-          // {"method":"ask_notification_sound","data":"0000000000000@c.us"}
 
-          FLog.Debug('Found notification sound query');
+          FLog.Debug('Received ask_notification');
 
           if FMMFLauncher.SuppressConsecutiveNotifications then
           begin
             Chat := FMMFLauncher.Chats.Get(JSONData.Value);
 
-            if Chat.LastNotificationSound > Trunc(GetTickCount64 / 1000) - 60 then
+            if Chat.LastNotification > Trunc(GetTickCount64 / 1000) - 60 then
               FWAMethodResult := TJSONBoolean.Create(False);
 
             FLog.Debug('Setting LastNotificationSound for "%s"'.Format([JSONData.Value]));
-            Chat.LastNotificationSound := Trunc(GetTickCount64 / 1000);
+            Chat.LastNotification := Trunc(GetTickCount64 / 1000);
             FMMFLauncher.Write;
           end;
 

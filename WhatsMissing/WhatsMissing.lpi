@@ -24,12 +24,16 @@
         <TextName Value="org.WhatsMissing.WhatsMissing"/>
         <TextDesc Value="WhatsMissing"/>
       </XPManifest>
+      <Resources Count="2">
+        <Resource_0 FileName="..\Resources\WhatsMissing.ico" Type="ICON" ResourceName="MAINICON"/>
+        <Resource_1 FileName="..\Resources\Patch_WAWebElectronPreload.js" Type="RCDATA" ResourceName="PATCH_WAWEBELECTRONPRELOAD"/>
+      </Resources>
     </General>
     <VersionInfo>
       <UseVersionInfo Value="True"/>
       <MinorVersionNr Value="4"/>
-      <RevisionNr Value="2"/>
-      <StringTable FileDescription="WhatsMissing" ProductName="WhatsMissing" ProductVersion="0.4.2.0"/>
+      <RevisionNr Value="3"/>
+      <StringTable FileDescription="WhatsMissing" ProductName="WhatsMissing" ProductVersion="0.4.3.0"/>
     </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="Debug" Default="True"/>
