@@ -57,7 +57,7 @@
 
                 changedChats = changedChats.filter(c => names[c.id.split('@')[0]]);
                 if (changedChats.length)
-                    window.__wm_call("chat_list_update", changedChats.map(c => ({ ...c, name: names[c.id.split('@')[0]] })));
+                    window.__wm_call("chat_list_update", changedChats.map(c => ({ ...c, muteExpiration: c.muteExpiration || 0, name: names[c.id.split('@')[0]] })));
 
                 if (removedChats.length)
                     window.__wm_call("chat_list_remove", removedChats.map(c => c.id));
