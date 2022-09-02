@@ -350,12 +350,14 @@ end;
 function TCSSDocument.FindRule(const SingleSelector: string): TCSSRule;
 var
   Rule: TCSSRule;
+  Selector: TCSSValue;
 begin
   Result := nil;
 
   for Rule in FRules do
-    if (Rule.FSelectors.Count = 1) and (Rule.Selectors[0].ValueEquals(SingleSelector)) then
-      Exit(Rule);
+    for Selector in Rule.FSelectors do
+      if Selector.ValueEquals(SingleSelector) then
+        Exit(Rule);
 end;
 
 function TCSSDocument.FindDeclarationValue(const SingleSelector: string; const DeclarationProp: string): TCSSValue;
