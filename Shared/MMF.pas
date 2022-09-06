@@ -116,6 +116,7 @@ type
     FShowUnreadMessagesBadge: Boolean;
     FUsePreRenderedOverlays: Boolean;
     FExcludeUnreadMessagesMutedChats: Boolean;
+    FNotificationIconColor: LongInt;
     FNotificationIconBadgeColor: LongInt;
     FNotificationIconBadgeTextColor: LongInt;
     FUseRegularTitleBar: Boolean;
@@ -148,6 +149,7 @@ type
     property ShowUnreadMessagesBadge: Boolean read FShowUnreadMessagesBadge write FShowUnreadMessagesBadge;
     property UsePreRenderedOverlays: Boolean read FUsePreRenderedOverlays write FUsePreRenderedOverlays;
     property ExcludeUnreadMessagesMutedChats: Boolean read FExcludeUnreadMessagesMutedChats write FExcludeUnreadMessagesMutedChats;
+    property NotificationIconColor: LongInt read FNotificationIconColor write FNotificationIconColor;
     property NotificationIconBadgeColor: LongInt read FNotificationIconBadgeColor write FNotificationIconBadgeColor;
     property NotificationIconBadgeTextColor: LongInt read FNotificationIconBadgeTextColor write FNotificationIconBadgeTextColor;
     property UseRegularTitleBar: Boolean read FUseRegularTitleBar write FUseRegularTitleBar;
@@ -577,6 +579,7 @@ begin
   FShowUnreadMessagesBadge := Boolean(MS.ReadByte);
   FUsePreRenderedOverlays := Boolean(MS.ReadByte);
   FExcludeUnreadMessagesMutedChats := Boolean(MS.ReadByte);
+  FNotificationIconColor := MS.ReadDWord;
   FNotificationIconBadgeColor := MS.ReadDWord;
   FNotificationIconBadgeTextColor := MS.ReadDWord;
   FUseRegularTitleBar := Boolean(MS.ReadByte);
@@ -615,6 +618,7 @@ begin
   MS.WriteByte(Byte(FShowUnreadMessagesBadge));
   MS.WriteByte(Byte(FUsePreRenderedOverlays));
   MS.WriteByte(Byte(FExcludeUnreadMessagesMutedChats));
+  MS.WriteDWord(FNotificationIconColor);
   MS.WriteDWord(FNotificationIconBadgeColor);
   MS.WriteDWord(FNotificationIconBadgeTextColor);
   MS.WriteByte(Byte(FUseRegularTitleBar));

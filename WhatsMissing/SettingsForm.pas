@@ -43,18 +43,32 @@ type
     constructor Create(const AOwner: TComponent; const ColorSetting: TColorSettingBase); reintroduce;
   end;
 
-  { TColorSettingControlSimple }
+  { TColorSettingControlSimpleStatic }
 
-  TColorSettingControlSimple = class(TColorSettingControlBase)
+  TColorSettingControlSimpleStatic = class(TColorSettingControlBase)
   private
-    FColorSetting: TColorSettingSimple;
+    FColorSetting: TColorSettingSimpleStatic;
   protected
     procedure UpdateColor; override;
     procedure ConfigureComboBox; override;
     procedure ComboReplaceTypeSelect(Sender: TObject); override;
     procedure PanelColorClick(Sender: TObject); override;
   public
-    constructor Create(const AOwner: TComponent; const ColorSetting: TColorSettingSimple); reintroduce;
+    constructor Create(const AOwner: TComponent; const ColorSetting: TColorSettingSimpleStatic); reintroduce;
+  end;
+
+  { TColorSettingControlSimpleImmersive }
+
+  TColorSettingControlSimpleImmersive = class(TColorSettingControlBase)
+  private
+    FColorSetting: TColorSettingSimpleImmersive;
+  protected
+    procedure UpdateColor; override;
+    procedure ConfigureComboBox; override;
+    procedure ComboReplaceTypeSelect(Sender: TObject); override;
+    procedure PanelColorClick(Sender: TObject); override;
+  public
+    constructor Create(const AOwner: TComponent; const ColorSetting: TColorSettingSimpleImmersive); reintroduce;
   end;
 
   { TColorSettingControlResource }
@@ -183,8 +197,10 @@ begin
     begin
       ColorSetting := FSettings.ColorSettings[i];
 
-      if ColorSetting is TColorSettingSimple then
-        SettingControl := TColorSettingControlSimple.Create(sbColors, TColorSettingSimple(ColorSetting))
+      if ColorSetting is TColorSettingSimpleStatic then
+        SettingControl := TColorSettingControlSimpleStatic.Create(sbColors, TColorSettingSimpleStatic(ColorSetting))
+      else if ColorSetting is TColorSettingSimpleImmersive then
+        SettingControl := TColorSettingControlSimpleImmersive.Create(sbColors, TColorSettingSimpleImmersive(ColorSetting))
       else if MMFLauncher.DefaultColors.ContainsKey(ColorSetting.ID) then
         SettingControl := TColorSettingControlResource.Create(sbColors, TColorSettingResource(ColorSetting), MMFLauncher.DefaultColors[ColorSetting.ID])
       else
@@ -263,8 +279,10 @@ begin
 
           if (ColorSetting is TColorSettingResource) and (SaveColorSetting is TColorSettingResource) then
             TColorSettingResource(SaveColorSetting).ColorType := TColorSettingResource(ColorSetting).ColorType
+          else if ColorSetting is TColorSettingSimpleStatic then
+            TColorSettingSimpleStatic(SaveColorSetting).ColorType := TColorSettingSimpleStatic(ColorSetting).ColorType
           else
-            TColorSettingSimple(SaveColorSetting).ColorType := TColorSettingSimple(ColorSetting).ColorType;
+            TColorSettingSimpleImmersive(SaveColorSetting).ColorType := TColorSettingSimpleImmersive(ColorSetting).ColorType;
 
           Break;
         end;
@@ -409,9 +427,9 @@ begin
   UpdateColor;
 end;
 
-{ TColorSettingControlSimple }
+{ TColorSettingControlSimpleStatic }
 
-constructor TColorSettingControlSimple.Create(const AOwner: TComponent; const ColorSetting: TColorSettingSimple);
+constructor TColorSettingControlSimpleStatic.Create(const AOwner: TComponent; const ColorSetting: TColorSettingSimpleStatic);
 begin
   FColorSetting := ColorSetting;
 
@@ -421,19 +439,19 @@ begin
   inherited Create(AOwner, ColorSetting);
 end;
 
-procedure TColorSettingControlSimple.UpdateColor;
+procedure TColorSettingControlSimpleStatic.UpdateColor;
 begin
   FPanelColor.Color := FColorSetting.GetColor(caNone);
 end;
 
-procedure TColorSettingControlSimple.ComboReplaceTypeSelect(Sender: TObject);
+procedure TColorSettingControlSimpleStatic.ComboReplaceTypeSelect(Sender: TObject);
 begin
   FColorSetting.ColorType := TColorTypeSimple(FComboColorType.ItemsEx[FComboColorType.ItemIndex].Data);
 
   inherited ComboReplaceTypeSelect(Sender);
 end;
 
-procedure TColorSettingControlSimple.PanelColorClick(Sender: TObject);
+procedure TColorSettingControlSimpleStatic.PanelColorClick(Sender: TObject);
 var
   Dlg: TColorDialog;
 begin
@@ -455,12 +473,77 @@ begin
   end;
 end;
 
-procedure TColorSettingControlSimple.ConfigureComboBox;
+procedure TColorSettingControlSimpleStatic.ConfigureComboBox;
 var
   i: Integer;
 begin
   if OsSupportsImmersiveColors then
-    FComboColorType.ItemsEx.AddItem('Use windows color', -1, -1, -1, -1, Pointer(ctsImmersive));
+    FComboColorType.ItemsEx.AddItem('Use default color', -1, -1, -1, -1, Pointer(ctsDefault));
+  FComboColorType.ItemsEx.AddItem('Use custom color', -1, -1, -1, -1, Pointer(ctsCustom));
+
+  for i := 0 to FComboColorType.ItemsEx.Count - 1 do
+    if FComboColorType.ItemsEx[i].Data = Pointer(FColorSetting.ColorType) then
+    begin
+      FComboColorType.ItemIndex := i;
+      Break;
+    end;
+
+  if FComboColorType.ItemIndex = -1 then
+    FComboColorType.ItemIndex := 0;
+end;
+
+{ TColorSettingControlSimpleImmersive }
+
+constructor TColorSettingControlSimpleImmersive.Create(const AOwner: TComponent; const ColorSetting: TColorSettingSimpleImmersive);
+begin
+  FColorSetting := ColorSetting;
+
+  if FColorSetting.ColorCustom = 0 then
+    FColorSetting.ColorCustom := FColorSetting.GetColor(caNone);
+
+  inherited Create(AOwner, ColorSetting);
+end;
+
+procedure TColorSettingControlSimpleImmersive.UpdateColor;
+begin
+  FPanelColor.Color := FColorSetting.GetColor(caNone);
+end;
+
+procedure TColorSettingControlSimpleImmersive.ComboReplaceTypeSelect(Sender: TObject);
+begin
+  FColorSetting.ColorType := TColorTypeSimple(FComboColorType.ItemsEx[FComboColorType.ItemIndex].Data);
+
+  inherited ComboReplaceTypeSelect(Sender);
+end;
+
+procedure TColorSettingControlSimpleImmersive.PanelColorClick(Sender: TObject);
+var
+  Dlg: TColorDialog;
+begin
+  Dlg := TColorDialog.Create(Self);
+  try
+    Dlg.Color := FColorSetting.GetColor(caNone);
+
+    if Dlg.Execute then
+    begin
+      TPanel(Sender).Color := Dlg.Color;
+
+      FComboColorType.ItemIndex := IfThen<Integer>(OsSupportsImmersiveColors, 1, 0);
+
+      FColorSetting.ColorType := ctsCustom;
+      FColorSetting.ColorCustom := Dlg.Color;
+    end;
+  finally
+    Dlg.Free;
+  end;
+end;
+
+procedure TColorSettingControlSimpleImmersive.ConfigureComboBox;
+var
+  i: Integer;
+begin
+  if OsSupportsImmersiveColors then
+    FComboColorType.ItemsEx.AddItem('Use windows color', -1, -1, -1, -1, Pointer(ctsDefault));
   FComboColorType.ItemsEx.AddItem('Use custom color', -1, -1, -1, -1, Pointer(ctsCustom));
 
   for i := 0 to FComboColorType.ItemsEx.Count - 1 do
@@ -549,7 +632,7 @@ begin
 
   FComboColorType.ItemsEx.AddItem('Use default', -1, -1, -1, -1, Pointer(ctrOriginal));
   if OsSupportsImmersiveColors then
-    FComboColorType.ItemsEx.AddItem('Use windows color', -1, -1, -1, -1, Pointer(ctrImmersive));
+    FComboColorType.ItemsEx.AddItem('Use windows color', -1, -1, -1, -1, Pointer(ctrDefault));
   FComboColorType.ItemsEx.AddItem('Use custom color', -1, -1, -1, -1, Pointer(ctrCustom));
 
   for i := 0 to FComboColorType.ItemsEx.Count - 1 do

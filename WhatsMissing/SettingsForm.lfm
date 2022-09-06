@@ -20,6 +20,7 @@ object frmSettings: TfrmSettings
   OnKeyDown = FormKeyDown
   OnShow = FormShow
   Position = poScreenCenter
+  LCLVersion = '2.2.2.0'
   object pnlSave: TPanel
     Left = 4
     Height = 32

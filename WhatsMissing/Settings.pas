@@ -16,8 +16,8 @@ uses
   SysUtils;
 
 type
-  TColorTypeSimple = (ctsImmersive, ctsCustom);
-  TColorTypeResource = (ctrOriginal, ctrImmersive, ctrCustom);
+  TColorTypeSimple = (ctsDefault, ctsCustom);
+  TColorTypeResource = (ctrOriginal, ctrDefault, ctrCustom);
   TColorAdjustment = (caDarken10 = -50, caDarken5 = -25, caDarken3 = -15, caDarken2 = -10, caDarken = -5, caNone = 0, caLighten = 5, caLighten2 = 10, caLighten3 = 15, caLighten5 = 25);
 
   TColorSettingResourcePatch = class;
@@ -30,19 +30,35 @@ type
     FID: Integer;
     FDescription: string;
     FColorCustom: TColor;
+    FColor: TColor;
     FColorImmersive: TImmersiveColorType;
   public
-    constructor Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType);
+    constructor Create(const ID: Integer; const Description: string; const Color: TColor); overload;
+    constructor Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType); overload;
 
     property ID: Integer read FID;
     property Description: string read FDescription;
     property ColorCustom: TColor read FColorCustom write FColorCustom;
+    property Color: TColor read FColor write FColor;
     property ColorImmersive: TImmersiveColorType read FColorImmersive;
   end;
 
-  { TColorSettingSimple }
+  { TColorSettingSimpleStatic }
 
-  TColorSettingSimple = class(TColorSettingBase)
+  TColorSettingSimpleStatic = class(TColorSettingBase)
+  protected
+    FColorType: TColorTypeSimple;
+  public
+    constructor Create(const ID: Integer; const Description: string; const Color: TColor); reintroduce;
+
+    function GetColor(const ColorAdjustment: TColorAdjustment): TColor;
+
+    property ColorType: TColorTypeSimple read FColorType write FColorType;
+  end;
+
+  { TColorSettingSimpleImmersive }
+
+  TColorSettingSimpleImmersive = class(TColorSettingBase)
   protected
     FColorType: TColorTypeSimple;
   public
@@ -114,8 +130,9 @@ type
     FLastUsedWhatsAppHash: Integer;
 
     FColorSettings: TList<TColorSettingBase>;
-    FNotificationIconBadgeColor: TColorSettingSimple;
-    FNotificationIconBadgeTextColor: TColorSettingSimple;
+    FNotificationIconColor: TColorSettingSimpleStatic;
+    FNotificationIconBadgeColor: TColorSettingSimpleImmersive;
+    FNotificationIconBadgeTextColor: TColorSettingSimpleImmersive;
 
     FShowNotificationIcon: Boolean;
     FShowUnreadMessagesBadge: Boolean;
@@ -231,9 +248,11 @@ begin
               ColorSetting.ColorCustom := JSONObjectResource.Get('ColorCustom', 0);
 
               if ColorSetting is TColorSettingResource then
-                TColorSettingResource(ColorSetting).ColorType := TColorTypeResource(JSONObjectResource.Get('Action', Byte(ctrImmersive)))
+                TColorSettingResource(ColorSetting).ColorType := TColorTypeResource(JSONObjectResource.Get('Action', Byte(ctrDefault)))
+              else if ColorSetting is TColorSettingSimpleStatic then
+                TColorSettingSimpleStatic(ColorSetting).ColorType := TColorTypeSimple(JSONObjectResource.Get('Action', Byte(ctsDefault)))
               else
-                TColorSettingSimple(ColorSetting).ColorType := TColorTypeSimple(JSONObjectResource.Get('Action', Byte(ctsImmersive)));
+                TColorSettingSimpleImmersive(ColorSetting).ColorType := TColorTypeSimple(JSONObjectResource.Get('Action', Byte(ctsDefault)));
 
               Break;
             end;
@@ -290,8 +309,10 @@ begin
 
       if ColorSetting is TColorSettingResource then
         JSONObjectResource.Add('Action', Integer(TColorSettingResource(ColorSetting).ColorType))
+      else if ColorSetting is TColorSettingSimpleStatic then
+        JSONObjectResource.Add('Action', Integer(TColorSettingSimpleStatic(ColorSetting).ColorType))
       else
-        JSONObjectResource.Add('Action', Integer(TColorSettingSimple(ColorSetting).ColorType));
+        JSONObjectResource.Add('Action', Integer(TColorSettingSimpleImmersive(ColorSetting).ColorType));
     end;
 
     FS := TFileStream.Create(FFilePath, fmCreate);
@@ -313,6 +334,7 @@ begin
   MMF.ShowUnreadMessagesBadge := FShowUnreadMessagesBadge;
   MMF.UsePreRenderedOverlays := FUsePreRenderedOverlays;
   MMF.ExcludeUnreadMessagesMutedChats := FExcludeUnreadMessagesMutedChats;
+  MMF.NotificationIconColor := ColorToRGB(FNotificationIconColor.GetColor(caNone));
   MMF.NotificationIconBadgeColor := ColorToRGB(FNotificationIconBadgeColor.GetColor(caNone));
   MMF.NotificationIconBadgeTextColor := ColorToRGB(FNotificationIconBadgeTextColor.GetColor(caNone));
   MMF.UseRegularTitleBar := FUseRegularTitleBar;
@@ -329,15 +351,20 @@ begin
     ColorSetting.Free;
   FColorSettings.Clear;
 
-  FNotificationIconBadgeColor := TColorSettingSimple.Create(500, 'Notification icon badge', ImmersiveLightWUError);
+  FNotificationIconColor := TColorSettingSimpleStatic.Create(502, 'Notification icon color', RGBToColor(40, 196, 76));
 
-  FNotificationIconBadgeTextColor := TColorSettingSimple.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted);
+  FNotificationIconBadgeColor := TColorSettingSimpleImmersive.Create(500, 'Notification icon badge', ImmersiveLightWUError);
+
+  FNotificationIconBadgeTextColor := TColorSettingSimpleImmersive.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted);
 
   FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter').UpdateInFile('svg.*.js').UpdateAllColors]));
+
+  FColorSettings.Add(FNotificationIconColor);
 
   FColorSettings.Add(FNotificationIconBadgeColor);
 
   FColorSettings.Add(FNotificationIconBadgeTextColor);
+
   FColorSettings.Add(TColorSettingResource.Create(18, 'Startup background', ImmersiveApplicationBackground, [TColorSettingResourcePatch.Create('--startup-background'),
     TColorSettingResourcePatch.Create('--startup-background-rgb').RGB,
     TColorSettingResourcePatch.Create('--startup-icon')]));
@@ -451,6 +478,13 @@ end;
 
 { TColorSettingBase }
 
+constructor TColorSettingBase.Create(const ID: Integer; const Description: string; const Color: TColor);
+begin
+  FID := ID;
+  FDescription := Description;
+  FColor := Color;
+end;
+
 constructor TColorSettingBase.Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType);
 begin
   FID := ID;
@@ -458,19 +492,42 @@ begin
   FColorImmersive := ColorImmersive;
 end;
 
-{ TColorSettingSimple }
+{ TColorSettingSimpleStatic }
 
-constructor TColorSettingSimple.Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType);
+constructor TColorSettingSimpleStatic.Create(const ID: Integer; const Description: string; const Color: TColor);
+begin
+  inherited Create(ID, Description, Color);
+
+  FColorType := ctsDefault;
+end;
+
+function TColorSettingSimpleStatic.GetColor(const ColorAdjustment: TColorAdjustment): TColor;
+begin
+  case FColorType of
+    ctsDefault:
+      Result := Color;
+    ctsCustom:
+      Result := ColorCustom;
+    else
+      raise Exception.Create('GetColor(): Invalid ColorType');
+  end;
+
+  Result := ColorAdjustLuma(Result, Integer(ColorAdjustment), True);
+end;
+
+{ TColorSettingSimpleImmersive }
+
+constructor TColorSettingSimpleImmersive.Create(const ID: Integer; const Description: string; const ColorImmersive: TImmersiveColorType);
 begin
   inherited Create(ID, Description, ColorImmersive);
 
-  FColorType := ctsImmersive;
+  FColorType := ctsDefault;
 end;
 
-function TColorSettingSimple.GetColor(const ColorAdjustment: TColorAdjustment): TColor;
+function TColorSettingSimpleImmersive.GetColor(const ColorAdjustment: TColorAdjustment): TColor;
 begin
   case FColorType of
-    ctsImmersive:
+    ctsDefault:
       Result := AlphaColorToColor(GetActiveImmersiveColor(ImmersiveColors.TImmersiveColorType(ColorImmersive)));
     ctsCustom:
       Result := ColorCustom;
@@ -488,7 +545,7 @@ begin
   inherited Create(ID, Description, ColorImmersive);
 
   FPatches := Patches;
-  FColorType := ctrImmersive;
+  FColorType := ctrDefault;
 end;
 
 destructor TColorSettingResource.Destroy;
@@ -504,7 +561,7 @@ begin
   case FColorType of
     ctrOriginal:
       Result := DefaultColor;
-    ctrImmersive:
+    ctrDefault:
       Result := AlphaColorToColor(GetActiveImmersiveColor(ImmersiveColors.TImmersiveColorType(ColorImmersive)));
     ctrCustom:
       Result := ColorCustom;
