@@ -75,6 +75,7 @@ type
     FNotificationMenu: HMENU;
     FTaskbarCreatedMsg: Cardinal;
     FForegroundForNotificationIcon: Boolean;
+    FMainWindowIcon: HICON;
 
     class function WndProcWrapper(hwnd: HWND; uMsg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall; static;
     class function MouseHookWrapper(Code: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall; static;
@@ -95,6 +96,7 @@ type
     procedure SetAlwaysOnTop(const Enabled: Boolean);
     function CreateNotificationIconPreRendered(const UnreadCount: Integer; const BackgroundColor, TextColor, ColorizeColor: LongInt): HICON;
     function CreateNotificationIconDrawn(const UnreadCount: Integer; const BackgroundColor, TextColor, ColorizeColor: LongInt): HICON;
+    procedure UpdateWindowIcon;
   public
     constructor Create(const hwnd: HWND; const Log: TLog);
     destructor Destroy; override;
@@ -209,6 +211,8 @@ begin
     WM_SHOWWINDOW:
       if Boolean(wParam) and (not FShown) then
       begin
+        UpdateWindowIcon;
+
         FShown := True;
         ShowOrUpdateNotificationIcon;
       end;
@@ -275,6 +279,8 @@ begin
     begin
       FMMFLauncher.Read;
       OldMMF := TMMFLauncher(wParam);
+
+      UpdateWindowIcon;
 
       if FMMFLauncher.ShowNotificationIcon then
         ShowOrUpdateNotificationIcon
@@ -761,6 +767,8 @@ begin
 
   DeleteDC(DC);
   DeleteObject(Bmp);
+
+  DestroyIcon(Icon);
 end;
 
 function TWindow.CreateNotificationIconDrawn(const UnreadCount: Integer; const BackgroundColor, TextColor, ColorizeColor: LongInt): HICON;
@@ -1024,6 +1032,58 @@ begin
 
   DeleteDC(DC);
   DeleteObject(Bmp);
+
+  DestroyIcon(Icon);
+end;
+
+procedure TWindow.UpdateWindowIcon;
+var
+  DC, Bmp, Icon: HANDLE;
+  BitmapStart: PRGBQUAD = nil;
+  BitmapHeader: BITMAPV5HEADER;
+  IconInfo: TICONINFO = (fIcon: False; xHotspot: 0; yHotspot: 0; hbmMask: 0; hbmColor: 0);
+  BitmapInfo: BITMAP;
+  BitmapSize: TSize;
+begin
+  if FMainWindowIcon <> 0 then
+    DestroyIcon(FMainWindowIcon);
+
+  if ExtractIconExW(PWideChar(UnicodeString(ParamStr(0))), 0, nil, @Icon, 1) <> 1 then
+    raise Exception.Create('ExtractIconExW() failed');
+
+  GetIconInfo(Icon, IconInfo);
+
+  GetObject(IconInfo.hbmColor, SizeOf(BitmapInfo), @BitmapInfo);
+
+  DeleteObject(IconInfo.hbmColor);
+  DeleteObject(IconInfo.hbmMask);
+
+  BitmapSize := TSize.Create(BitmapInfo.bmWidth, BitmapInfo.bmHeight);
+
+  DC := CreateCompatibleDC(0);
+
+  BitmapHeader := GetBitmapHeader(BitmapSize);
+  Bmp := TCreateDIBSection(@CreateDIBSection)(DC, BitmapHeader, DIB_RGB_COLORS, BitmapStart, 0, 0);
+
+  SelectObject(DC, Bmp);
+  DrawIconEx(DC, 0, 0, Icon, BitmapSize.Width, BitmapSize.Height, 0, 0, DI_NORMAL);
+
+  ColorizeBitmap(BitmapStart, BitmapStart + BitmapInfo.bmWidth * BitmapInfo.bmHeight * SizeOf(TRGBQUAD), FMMFLauncher.WindowIconColor);
+
+  IconInfo.fIcon := True;
+  IconInfo.xHotspot := 0;
+  IconInfo.yHotspot := 0;
+  IconInfo.hbmColor := Bmp;
+  IconInfo.hbmMask := Bmp;
+
+  FMainWindowIcon := CreateIconIndirect(IconInfo);
+
+  SendMessage(FHandle, WM_SETICON, ICON_SMALL, FMainWindowIcon);
+
+  DeleteDC(DC);
+  DeleteObject(Bmp);
+
+  DestroyIcon(Icon);
 end;
 
 end.

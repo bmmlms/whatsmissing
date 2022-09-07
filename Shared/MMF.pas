@@ -112,6 +112,7 @@ type
     FChats: TChatList;
 
     // Things copied from settings
+    FWindowIconColor: LongInt;
     FShowNotificationIcon: Boolean;
     FShowUnreadMessagesBadge: Boolean;
     FUsePreRenderedOverlays: Boolean;
@@ -145,6 +146,7 @@ type
     property DefaultColors: TDictionary<Integer, TColor> read FDefaultColors;
     property Chats: TChatList read FChats;
 
+    property WindowIconColor: LongInt read FWindowIconColor write FWindowIconColor;
     property ShowNotificationIcon: Boolean read FShowNotificationIcon write FShowNotificationIcon;
     property ShowUnreadMessagesBadge: Boolean read FShowUnreadMessagesBadge write FShowUnreadMessagesBadge;
     property UsePreRenderedOverlays: Boolean read FUsePreRenderedOverlays write FUsePreRenderedOverlays;
@@ -575,6 +577,7 @@ begin
 
   FChats.ReadStream(MS);
 
+  FWindowIconColor := MS.ReadDWord;
   FShowNotificationIcon := Boolean(MS.ReadByte);
   FShowUnreadMessagesBadge := Boolean(MS.ReadByte);
   FUsePreRenderedOverlays := Boolean(MS.ReadByte);
@@ -614,6 +617,7 @@ begin
 
   FChats.WriteStream(MS);
 
+  MS.WriteDWord(FWindowIconColor);
   MS.WriteByte(Byte(FShowNotificationIcon));
   MS.WriteByte(Byte(FShowUnreadMessagesBadge));
   MS.WriteByte(Byte(FUsePreRenderedOverlays));

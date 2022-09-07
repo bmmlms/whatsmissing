@@ -130,6 +130,7 @@ type
     FLastUsedWhatsAppHash: Integer;
 
     FColorSettings: TList<TColorSettingBase>;
+    FWindowIconColor: TColorSettingSimpleStatic;
     FNotificationIconColor: TColorSettingSimpleStatic;
     FNotificationIconBadgeColor: TColorSettingSimpleImmersive;
     FNotificationIconBadgeTextColor: TColorSettingSimpleImmersive;
@@ -330,6 +331,7 @@ end;
 
 procedure TSettings.CopyToMMF(MMF: TMMFLauncher);
 begin
+  MMF.WindowIconColor := ColorToRGB(FWindowIconColor.GetColor(caNone));
   MMF.ShowNotificationIcon := FShowNotificationIcon;
   MMF.ShowUnreadMessagesBadge := FShowUnreadMessagesBadge;
   MMF.UsePreRenderedOverlays := FUsePreRenderedOverlays;
@@ -351,6 +353,8 @@ begin
     ColorSetting.Free;
   FColorSettings.Clear;
 
+  FWindowIconColor := TColorSettingSimpleStatic.Create(503, 'Window icon color', RGBToColor(40, 196, 76));
+
   FNotificationIconColor := TColorSettingSimpleStatic.Create(502, 'Notification icon color', RGBToColor(40, 196, 76));
 
   FNotificationIconBadgeColor := TColorSettingSimpleImmersive.Create(500, 'Notification icon badge', ImmersiveLightWUError);
@@ -358,6 +362,8 @@ begin
   FNotificationIconBadgeTextColor := TColorSettingSimpleImmersive.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted);
 
   FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter').UpdateInFile('svg.*.js').UpdateAllColors]));
+
+  FColorSettings.Add(FWindowIconColor);
 
   FColorSettings.Add(FNotificationIconColor);
 
