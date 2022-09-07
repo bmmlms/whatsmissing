@@ -412,7 +412,8 @@ begin
             Chat.SetMute(JSONObjectChat.Integers['muteExpiration']);
             Chat.SetUnreadMessages(JSONObjectChat.Integers['unreadCount'] = -1, IfThen<UInt16>(JSONObjectChat.Integers['unreadCount'] > 0, JSONObjectChat.Integers['unreadCount'], 0));
             Chat.Name := JSONObjectChat.Strings['name'];
-            Chat.LastCommunication := JSONObjectChat.Integers['lastCommunication'];
+            if Assigned(JSONObject.Find('lastCommunication')) then
+              Chat.LastCommunication := JSONObjectChat.Integers['lastCommunication'];
 
             FLog.Debug('  Updated chat: %s'.Format([Chat.ToString]));
           end;
