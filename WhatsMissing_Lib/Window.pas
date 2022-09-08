@@ -449,9 +449,11 @@ begin
   FMMFLauncher.Chats.GetUnreadChats(Days, Length(FNotifyData.szTip), FMMFLauncher.ExcludeUnreadMessagesMutedChats, UnreadChatCount, ToolTip);
 
   if FMMFLauncher.UsePreRenderedOverlays then
-    FNotifyData.hIcon := CreateNotificationIconPreRendered(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadChatCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor, FMMFLauncher.NotificationIconColor)
+    FNotifyData.hIcon := CreateNotificationIconPreRendered(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadChatCount, 0), FMMFLauncher.NotificationIconBadgeColor,
+      FMMFLauncher.NotificationIconBadgeTextColor, FMMFLauncher.NotificationIconColor)
   else
-    FNotifyData.hIcon := CreateNotificationIconDrawn(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadChatCount, 0), FMMFLauncher.NotificationIconBadgeColor, FMMFLauncher.NotificationIconBadgeTextColor, FMMFLauncher.NotificationIconColor);
+    FNotifyData.hIcon := CreateNotificationIconDrawn(IfThen<Integer>(FMMFLauncher.ShowUnreadMessagesBadge, UnreadChatCount, 0), FMMFLauncher.NotificationIconBadgeColor,
+      FMMFLauncher.NotificationIconBadgeTextColor, FMMFLauncher.NotificationIconColor);
 
   // SendMessage(FHandle, WM_SETICON, ICON_SMALL, FNotifyData.hIcon);
 
@@ -624,6 +626,9 @@ end;
 procedure ColorizeBitmap(const BitmapStart, BitmapEnd: Pointer; const Color: LongInt);
 var
   H, L, S, HO, LO, SO: Byte;
+  Cnt: Integer = 0;
+  AvgL: Integer = 0;
+  LDiff: Integer = 0;
   RGBQuad: PRGBQUAD;
 begin
   ColorToHLS(Color, H, L, S);
@@ -632,6 +637,35 @@ begin
   while RGBQuad < BitmapEnd do
   begin
     RGBtoHLS(RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue, HO, LO, SO);
+
+    if (SO > 180) and (LO < 200) then
+    begin
+      Inc(AvgL, LO);
+      Inc(Cnt);
+    end;
+
+    RGBQuad := PRGBQUAD(NativeUInt(RGBQuad) + SizeOf(TRGBQUAD));
+  end;
+
+  AvgL := Trunc(AvgL / Cnt);
+  LDiff := L - AvgL;
+
+  RGBQuad := BitmapStart;
+  while RGBQuad < BitmapEnd do
+  begin
+    RGBtoHLS(RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue, HO, LO, SO);
+
+    if (LDiff > 0) then
+      if Byte(LO + LDiff) > LO then
+        LO += LDiff
+      else
+        LO := $FF;
+
+    if (LDiff < 0) then
+      if Byte(LO + LDiff) < LO then
+        LO += LDiff
+      else
+        LO := $00;
 
     HLSToRGB(H, LO, S, RGBQuad.rgbRed, RGBQuad.rgbGreen, RGBQuad.rgbBlue);
 
