@@ -17,8 +17,7 @@ WhatsMissing is a launcher that provides some extensions to the official Windows
 - WhatsApp can be minimized to the notification area using the close button/escape key
 - Notification icon indicates whether new messages were received
 - WhatsApp can be configured to be always on top
-- Suppression of outbound online/typing notifications
-- Suppression of consecutive notification sounds
+- Suppression of consecutive notifications
 - Easy installation/uninstallation without modifications to WhatsApp's original files
 - Built using Lazarus :fire:
 
