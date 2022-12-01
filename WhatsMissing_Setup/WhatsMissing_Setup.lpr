@@ -12,8 +12,6 @@ uses
 
 {$R *.res}
 
-{$LINKLIB libminlzlib.a}
-
 function XzDecode(InputBuffer: PUInt8; InputSize: UInt32; OutputBuffer: PUInt8; OutputSize: PUInt32): longbool; cdecl; external;
 
 type
@@ -49,13 +47,7 @@ begin
         Inc(ByteCount, Files[i].Size);
       end;
 
-      if not XzDecode(ResStream.Memory + ResStream.Position, ResStream.Size - ResStream.Position, nil, @OutputSize) then
-        Exit;
-
-      ArchiveStream.SetSize(OutputSize);
-
-      if not XzDecode(ResStream.Memory + ResStream.Position, ResStream.Size - ResStream.Position, ArchiveStream.Memory, @OutputSize) then
-        Exit;
+      ArchiveStream.CopyFrom(ResStream, ByteCount);
 
       Result := True;
     finally

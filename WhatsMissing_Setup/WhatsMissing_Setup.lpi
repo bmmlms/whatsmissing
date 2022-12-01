@@ -43,7 +43,6 @@
             <Filename Value="..\Build\WhatsMissing_Setup"/>
           </Target>
           <SearchPaths>
-            <Libraries Value="..\SubModules\minlzma\build\minlzlib"/>
             <OtherUnitFiles Value="..\Shared"/>
             <UnitOutputDirectory Value="..\Build\DCU\$(TargetCPU)"/>
           </SearchPaths>
@@ -117,7 +116,6 @@
       <Filename Value="..\Build\WhatsMissing_Setup"/>
     </Target>
     <SearchPaths>
-      <Libraries Value="..\SubModules\minlzma\build\minlzlib"/>
       <OtherUnitFiles Value="..\Shared"/>
       <UnitOutputDirectory Value="..\Build\DCU\$(TargetCPU)"/>
     </SearchPaths>

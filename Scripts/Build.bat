@@ -55,10 +55,7 @@ IF ERRORLEVEL 1 GOTO FAIL
 type Build\WhatsMissing-i386.exe Build\WhatsMissing-x86_64.exe Build\WhatsMissing-i386.dll Build\WhatsMissing-x86_64.dll > Build\SetupResources\Files.bin
 IF ERRORLEVEL 1 GOTO FAIL
 
-"%ZIP%" a dummy -txz -mx=9 -so Build\SetupResources\Files.bin > Build\SetupResources\Files.xz
-IF ERRORLEVEL 1 GOTO FAIL
-
-type Build\SetupResources\Toc.bin Build\SetupResources\Files.xz > Build\SetupResources\Output.bin
+type Build\SetupResources\Toc.bin Build\SetupResources\Files.bin > Build\SetupResources\Output.bin
 IF ERRORLEVEL 1 GOTO FAIL
 
 REM Build setup
