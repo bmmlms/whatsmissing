@@ -12,8 +12,6 @@ uses
 
 {$R *.res}
 
-function XzDecode(InputBuffer: PUInt8; InputSize: UInt32; OutputBuffer: PUInt8; OutputSize: PUInt32): longbool; cdecl; external;
-
 type
   TFileData = record
     Name: string;

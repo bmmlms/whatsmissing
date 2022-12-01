@@ -4,7 +4,6 @@ REM Pathes of required tools
 SET "FPCBIN=D:\Lazarus\fpc\3.2.2\bin\x86_64-win64"
 SET "ZIP=D:\7-Zip\7z.exe"
 SET "PLINK=C:\Program Files\PuTTY\plink.exe"
-SET "MSYS2=D:\msys64\msys2_shell.cmd"
 
 IF NOT EXIST %FPCBIN% GOTO FAILENVIRONMENT
 
@@ -19,10 +18,6 @@ REM Build images
 SET "INSTANTFPCOPTIONS=-Fu%FPCBIN%\..\..\..\..\lcl\units\x86_64-win64\win32 -Fu%FPCBIN%\..\..\..\..\lcl\units\x86_64-win64 -Fu%FPCBIN%\..\..\..\..\components\lazutils\lib\x86_64-win64"
 
 instantfpc ProcessImages.pas ..\Resources\Notification\*.png ..\WhatsMissing_Lib\NotificationOverlays.pas
-
-REM Build libraries
-call "%MSYS2%" -defterm -no-start -where "%cd%\..\SubModules\minlzma" -mingw32 -c "sed -i 's/\-Wconversion //g' minlzlib/CMakeLists.txt minlzdec/CMakeLists.txt && git checkout minlzlib/xzstream.h && echo '#define _In_' >> minlzlib/xzstream.h && mkdir -p build && cd build && cmake .. && make -j && exit"
-if %ERRORLEVEL% GEQ 1 exit /B %ERRORLEVEL%
 
 REM Build exes
 cd ..\WhatsMissing

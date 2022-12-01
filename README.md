@@ -36,7 +36,6 @@ When WhatsApp is running right click the notification icon to open the settings 
 
 ### Building
 - Install Lazarus IDE and the tools to crosscompile
-- Install MSYS2 with mingw32 (only required for building the installer)
 
 To use the build script "Build.bat" you need to configure variables at the top of the file.
 
@@ -46,4 +45,3 @@ To use the build script "Build.bat" you need to configure variables at the top o
 - [Yusuke Kamiyamane](https://p.yusukekamiyamane.com/about) for Fugue Icons
 - [FatCow Web Hosting](https://www.fatcow.com/free-icons) for icons
 - [MahdiSafsafi](https://github.com/MahdiSafsafi) for DDetours and ImmersiveColors
-- [Alex Ionescu](https://github.com/ionescu007) for minlzma
