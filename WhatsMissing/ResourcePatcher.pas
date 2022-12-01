@@ -142,10 +142,10 @@ const
   AddCursorDefault: array[0..2] of string = ('#windows-title-minimize', '#windows-title-maximize', '#windows-title-close');
 
   JsRegExReplacements: array[0..2] of TRegExReplace = (
-    (FilePattern: ['bootstrap_main.*.js']; Search: 'var (.)=this\.msg\.chat;return!!(.)\.MuteCollection\.globalMute\(\)\.isMuted';
+    (FilePattern: ['main.*.js']; Search: 'var (.)=this\.msg\.chat;return!!(.)\.MuteCollection\.globalMute\(\)\.isMuted';
       Replace: 'var $1=this.msg.chat; return !window.__wm_call("ask_notification", $1.__x_id._serialized) || !!$2.MuteCollection.globalMute().isMuted'),
-    (FilePattern: ['bootstrap_main.*.js']; Search: 'case (.)\.StreamInfo\.NORMAL:'; Replace: 'case $1.StreamInfo.NORMAL:window.__wm_start();'),
-    (FilePattern: ['bootstrap_main.*.js']; Search: 'case (.)\.StreamInfo\.OFFLINE:'; Replace: 'case $1.StreamInfo.OFFLINE:window.__wm_stop();')
+    (FilePattern: ['main.*.js']; Search: 'case (.)\.StreamInfo\.NORMAL:'; Replace: 'case $1.StreamInfo.NORMAL:window.__wm_start();'),
+    (FilePattern: ['main.*.js']; Search: 'case (.)\.StreamInfo\.OFFLINE:'; Replace: 'case $1.StreamInfo.OFFLINE:window.__wm_stop();')
   );
 var
   Asar: TASAR;
