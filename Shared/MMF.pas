@@ -550,7 +550,7 @@ var
   Count: SmallInt;
   Color: TColor;
 begin
-  FLauncherPid := MS.ReadWord;
+  FLauncherPid := MS.ReadDWord;
   FLauncherWindowHandle := MS.ReadQWord;
   FWhatsAppGuiPid := MS.ReadDWord;
   FWhatsAppWindowHandle := MS.ReadQWord;
@@ -596,7 +596,7 @@ procedure TMMFLauncher.WriteStream(const MS: TMemoryStream);
 var
   DefaultColor: TPair<Integer, TColor>;
 begin
-  MS.WriteWord(FLauncherPid);
+  MS.WriteDWord(FLauncherPid);
   MS.WriteQWord(FLauncherWindowHandle);
   MS.WriteDWord(FWhatsAppGuiPid);
   MS.WriteQWord(FWhatsAppWindowHandle);
