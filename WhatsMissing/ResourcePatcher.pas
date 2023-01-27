@@ -377,7 +377,7 @@ begin
 
         if FSettings.UseRegularTitleBar then
         begin
-          CssRule := FileInfo.CssDocument.FindRule('html[dir] #windows-title-bar');
+          CssRule := FileInfo.CssDocument.FindFirstRule('html[dir] #windows-title-bar');
           if Assigned(CssRule) then
           begin
             CssRule.Declarations.Add(TCSSDeclaration.Create('display', 'none'));
@@ -385,7 +385,7 @@ begin
             FileInfo.Modified := True;
           end;
 
-          CssRule := FileInfo.CssDocument.FindRule('#app.windows-native-app');
+          CssRule := FileInfo.CssDocument.FindFirstRule('#app.windows-native-app');
           if Assigned(CssRule) then
           begin
             CssDeclaration := CssRule.FindDeclarationByProp('top');
@@ -402,14 +402,14 @@ begin
         begin
           if FSettings.HideMaximize then
           begin
-            CssRule := FileInfo.CssDocument.FindRule('html[dir=ltr] #windows-title-minimize');
+            CssRule := FileInfo.CssDocument.FindFirstRule('html[dir=ltr] #windows-title-minimize');
             if Assigned(CssRule) then
             begin
               CssRule.FindDeclarationByProp('right').Value.Value := '45px';
               FileInfo.Modified := True;
             end;
 
-            CssRule := FileInfo.CssDocument.FindRule('#windows-title-maximize');
+            CssRule := FileInfo.CssDocument.FindFirstRule('#windows-title-maximize');
             if Assigned(CssRule) then
             begin
               CssRule.FindDeclarationByProp('width').Value.Value := '0px';
@@ -419,7 +419,7 @@ begin
 
           for Selector in SetOpacityOne do
           begin
-            CssRule := FileInfo.CssDocument.FindRule(Selector);
+            CssRule := FileInfo.CssDocument.FindFirstRule(Selector);
             if Assigned(CssRule) then
             begin
               CssRule.FindDeclarationByProp('opacity').Value.Value := '1';
@@ -429,7 +429,7 @@ begin
 
           for Selector in AddCursorDefault do
           begin
-            CssRule := FileInfo.CssDocument.FindRule(Selector);
+            CssRule := FileInfo.CssDocument.FindFirstRule(Selector);
             if Assigned(CssRule) then
             begin
               CssRule.Declarations.Add(TCSSDeclaration.Create('cursor', 'default'));

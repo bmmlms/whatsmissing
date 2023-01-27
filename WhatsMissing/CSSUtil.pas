@@ -63,6 +63,8 @@ type
     property Declarations: TList<TCSSDeclaration> read FDeclarations;
   end;
 
+  TCSSRuleArray = array of TCSSRule;
+
   { TCSSMediaQuery }
 
   TCSSMediaQuery = class
@@ -106,7 +108,8 @@ type
     constructor Create(const Stream: TMemoryStream);
     destructor Destroy; override;
 
-    function FindRule(const SingleSelector: string): TCSSRule;
+    function FindFirstRule(const SingleSelector: string): TCSSRule;
+    function FindRules(const SingleSelector: string): TCSSRuleArray;
     function FindDeclarationValue(const SingleSelector: string; const DeclarationProp: string): TCSSValue;
     function SetDeclarationValuesByValue(const OldValue, NewValue: string): Integer;
     function GetVariableValue(const Variable: string): string;
@@ -347,7 +350,7 @@ begin
   inherited Destroy;
 end;
 
-function TCSSDocument.FindRule(const SingleSelector: string): TCSSRule;
+function TCSSDocument.FindFirstRule(const SingleSelector: string): TCSSRule;
 var
   Rule: TCSSRule;
   Selector: TCSSValue;
@@ -360,22 +363,37 @@ begin
         Exit(Rule);
 end;
 
+function TCSSDocument.FindRules(const SingleSelector: string): TCSSRuleArray;
+var
+  Rule: TCSSRule;
+  Selector: TCSSValue;
+begin
+  Result := [];
+
+  for Rule in FRules do
+    for Selector in Rule.FSelectors do
+      if Selector.ValueEquals(SingleSelector) then
+        Result += [Rule];
+end;
+
 function TCSSDocument.FindDeclarationValue(const SingleSelector: string; const DeclarationProp: string): TCSSValue;
 var
   Rule: TCSSRule;
+  Rules: TCSSRuleArray;
   Declaration: TCSSDeclaration;
 begin
   Result := nil;
 
-  Rule := FindRule(SingleSelector);
-  if not Assigned(Rule) then
+  Rules := FindRules(SingleSelector);
+  if Length(Rules) = 0 then
     Exit;
 
-  Declaration := Rule.FindDeclarationByProp(DeclarationProp);
-  if not Assigned(Declaration) then
-    Exit;
-
-  Result := Declaration.FValue;
+  for Rule in Rules do
+  begin
+    Declaration := Rule.FindDeclarationByProp(DeclarationProp);
+    if Assigned(Declaration) then
+      Exit(Declaration.Value);
+  end;
 end;
 
 function TCSSDocument.SetDeclarationValuesByValue(const OldValue, NewValue: string): Integer;
