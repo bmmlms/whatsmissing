@@ -87,7 +87,6 @@ begin
     S := round(255 * aDelta / (510 - aMax - aMin));
 end;
 
-
 procedure HLSToRGB(const H, L, S: Byte; out R, G, B: Byte);
 var
   hue, chroma, x: Single;

@@ -140,7 +140,7 @@ var
   LastError: Cardinal;
 begin
   if string(lpApplicationName).Trim.ToLower.Equals(FMMFLauncher.WhatsMissingExe32.ToLower) or string(lpApplicationName).Trim.ToLower.Equals(FMMFLauncher.WhatsMissingExe64.ToLower) or
-    string(lpCommandLine).ToLower.Contains('--squirrel-obsolete') then
+    string(lpCommandLine).ToLower.Contains('--squirrel-updated') then
     Exit(OCreateProcessInternalW(hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation, hNewToken));
 
   Result := OCreateProcessInternalW(hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags or CREATE_SUSPENDED, lpEnvironment,
