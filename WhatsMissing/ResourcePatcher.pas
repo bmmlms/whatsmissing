@@ -349,6 +349,7 @@ begin
 
     // Perform non-color modifications from settings
     for FileInfo in FileInfos do
+    begin
       if Assigned(FileInfo.CssDocument) then
       begin
         if FSettings.RemoveRoundedElementCorners then
@@ -438,6 +439,10 @@ begin
           end;
         end;
       end;
+
+      if FSettings.RemoveRoundedElementCorners and (FileInfo.AsarFile.Name = 'renderer.js') then
+        FileInfo.Js := FileInfo.Js.Replace('M106.251,0.5C164.653,0.5,212,47.846,212,106.25S164.653,212,106.25,212C47.846,212,0.5,164.654,0.5,106.25 S47.846,0.5,106.251,0.5z', 'M 0 0 V 212 H 212 V 0 H 0', [rfReplaceAll]);
+    end;
 
     // Patch JavaScript
     if not FJsError then
