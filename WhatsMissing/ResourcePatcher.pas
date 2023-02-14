@@ -142,8 +142,8 @@ const
   AddCursorDefault: array[0..2] of string = ('#windows-title-minimize', '#windows-title-maximize', '#windows-title-close');
 
   JsRegExReplacements: array[0..2] of TRegExReplace = (
-    (FilePattern: ['main.*.js']; Search: 'var (.)=this\.msg\.chat;return!!(.)\.MuteCollection\.globalMute\(\)\.isMuted';
-      Replace: 'var $1=this.msg.chat; return !window.__wm_call("ask_notification", $1.__x_id._serialized) || !!$2.MuteCollection.globalMute().isMuted'),
+    (FilePattern: ['renderer.js']; Search: '(key:"shouldPlaySound",value:function\(\)\{return)(\(0,)';
+      Replace: '$1 window.__wm_call("ask_notification", this.msg.chat.__x_id._serialized) && $2'),
     (FilePattern: ['main.*.js']; Search: 'case (.)\.StreamInfo\.NORMAL:'; Replace: 'case $1.StreamInfo.NORMAL:window.__wm_start();'),
     (FilePattern: ['main.*.js']; Search: 'case (.)\.StreamInfo\.OFFLINE:'; Replace: 'case $1.StreamInfo.OFFLINE:window.__wm_stop();')
   );
@@ -318,7 +318,7 @@ begin
             else
             begin
               FCssError := True;
-              FLog.Error('"%s" could not be found'.Format([OriginalClassesToColors[ResourcePatch.DeclarationProp]]));
+              FLog.Error('"%s" could not be found for UpdateAllColors'.Format([OriginalClassesToColors[ResourcePatch.DeclarationProp]]));
             end;
           end;
 
@@ -342,7 +342,7 @@ begin
             else
             begin
               FCssError := True;
-              FLog.Error('"%s" could not be found'.Format([OriginalClassesToColors[ResourcePatch.DeclarationProp]]));
+              FLog.Error('"%s" could not be found for UpdateInFile "%s"'.Format([OriginalClassesToColors[ResourcePatch.DeclarationProp], ResourcePatch.Options.UpdateInFile]));
             end;
           end;
         end;
