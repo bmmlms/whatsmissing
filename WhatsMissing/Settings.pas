@@ -361,7 +361,7 @@ begin
 
   FNotificationIconBadgeTextColor := TColorSettingSimpleImmersive.Create(501, 'Notification icon badge text', ImmersiveControlLightSelectTextHighlighted);
 
-  FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter').UpdateInFile('svg.*.js').UpdateAllColors]));
+  FColorSettings.Add(TColorSettingResource.Create(1, 'Titlebar', ImmersiveSystemAccent, [TColorSettingResourcePatch.Create('--teal-lighter').UpdateAllColors]));
 
   FColorSettings.Add(FWindowIconColor);
 
@@ -394,16 +394,18 @@ begin
   FColorSettings.Add(TColorSettingResource.Create(25, 'Input background', ImmersiveControlContextMenuBackgroundRest, [TColorSettingResourcePatch.Create('--search-input-background'),
     TColorSettingResourcePatch.Create('--compose-input-background')]));
 
-  FColorSettings.Add(TColorSettingResource.Create(26, 'Icons', ImmersiveControlDefaultLightButtonBackgroundRest, [TColorSettingResourcePatch.Create('--button-round-icon-inverted').UpdateInFile('svg.*.js'),
+  FColorSettings.Add(TColorSettingResource.Create(26, 'Icons', ImmersiveControlDefaultLightButtonBackgroundRest, [TColorSettingResourcePatch.Create('--button-round-icon-inverted'),
     TColorSettingResourcePatch.Create('--icon'), TColorSettingResourcePatch.Create('--panel-header-icon'), TColorSettingResourcePatch.Create('--icon-search-back')]));
 
-  FColorSettings.Add(TColorSettingResource.Create(11, 'New voice mail icon', ImmersiveLightWUError, [TColorSettingResourcePatch.Create('--ptt-green').UpdateInFile('svg.*.js')]));
+  FColorSettings.Add(TColorSettingResource.Create(27, 'Unseen status dot', ImmersiveLightWUError, [TColorSettingResourcePatch.Create('--ptt-thumb-incoming-unplayed')]));
 
   FColorSettings.Add(TColorSettingResource.Create(12, 'Acknowledged icons', ImmersiveLightWUNormal, [TColorSettingResourcePatch.Create('--ptt-blue')]));
 
   FColorSettings.Add(TColorSettingResource.Create(13, '"Typing..." notification', ImmersiveSaturatedCommandRowPressed, [TColorSettingResourcePatch.Create('--typing')]));
 
   FColorSettings.Add(TColorSettingResource.Create(4, 'Unread message badge', ImmersiveLightWUError, [TColorSettingResourcePatch.Create('--unread-marker-background')]));
+
+  FColorSettings.Add(TColorSettingResource.Create(11, 'New voice mail icon', ImmersiveLightWUError, [TColorSettingResourcePatch.Create('--ptt-green').UpdateInFile('main.*.js')]));
 
   FColorSettings.Add(TColorSettingResource.Create(14, 'Primary button background', ImmersiveControlDefaultLightButtonBackgroundRest,
     [TColorSettingResourcePatch.Create('--button-primary-background'), TColorSettingResourcePatch.Create('--button-primary-background-hover').Darken3]));
