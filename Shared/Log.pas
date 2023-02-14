@@ -12,7 +12,7 @@ uses
 type
   TLog = class
   private
-    FFileName: string;
+    FFilename: string;
     FHandle: THandle;
     procedure Write(const Msg: string);
   public
@@ -22,7 +22,7 @@ type
     procedure Debug(const Msg: string);
     procedure Error(const Msg: string);
 
-    property FileName: string read FFileName;
+    property Filename: string read FFilename;
     property Handle: THandle read FHandle;
   end;
 
@@ -30,13 +30,13 @@ implementation
 
 { TLog }
 
-constructor TLog.Create(const FileName: string);
+constructor TLog.Create(const Filename: string);
 var
   W: Cardinal = 0;
 begin
-  FFileName := FileName;
-  FHandle := TFunctions.CreateFile(FileName, FILE_APPEND_DATA, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-  if GetLastError <> ERROR_ALREADY_EXISTS then
+  FFilename := Filename;
+  FHandle := TFunctions.CreateFile(Filename, FILE_APPEND_DATA, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+  if (FHandle <> 0) and (GetLastError <> ERROR_ALREADY_EXISTS) then
     WriteFile(FHandle, UTF8_BOM[0], Length(UTF8_BOM), W, nil);
 end;
 
