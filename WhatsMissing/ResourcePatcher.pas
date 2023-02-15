@@ -147,6 +147,8 @@ const
     (FilePattern: ['main.*.js']; Search: 'case (.)\.StreamInfo\.NORMAL:'; Replace: 'case $1.StreamInfo.NORMAL:window.__wm_start();'),
     (FilePattern: ['main.*.js']; Search: 'case (.)\.StreamInfo\.OFFLINE:'; Replace: 'case $1.StreamInfo.OFFLINE:window.__wm_stop();')
   );
+
+  RoundSvg: string = 'M106.251,0.5C164.653,0.5,212,47.846,212,106.25S164.653,212,106.25,212C47.846,212,0.5,164.654,0.5,106.25 S47.846,0.5,106.251,0.5z';
 var
   Asar: TASAR;
   AsarEntry: TASAREntry;
@@ -295,6 +297,20 @@ begin
       if (ColorSetting.ClassType = TColorSettingResource) then
         for ResourcePatch in ColorSettingResource.Patches do
         begin
+          if not OriginalClassesToColors.ContainsKey(ResourcePatch.DeclarationProp) then
+          begin
+            FCssError := True;
+            FLog.Error('OriginalClassesToColors does not contain key "%s"'.Format([ResourcePatch.DeclarationProp]));
+            Continue;
+          end;
+
+          if not OriginalColorToColors.ContainsKey(OriginalClassesToColors[ResourcePatch.DeclarationProp]) then
+          begin
+            FCssError := True;
+            FLog.Error('OriginalColorToColors does not contain key "%s"'.Format([OriginalClassesToColors[ResourcePatch.DeclarationProp]]));
+            Continue;
+          end;
+
           if ResourcePatch.Options.UpdateAllColors then
           begin
             PatchReplaceCount := 0;
@@ -302,9 +318,6 @@ begin
             for FileInfo in FileInfos do
               if Assigned(FileInfo.CssDocument) then
               begin
-                if not OriginalClassesToColors.ContainsKey(ResourcePatch.DeclarationProp) or not OriginalColorToColors.ContainsKey(OriginalClassesToColors[ResourcePatch.DeclarationProp]) then
-                  Continue;
-
                 ReplaceCount := FileInfo.CssDocument.SetDeclarationValuesByValue(OriginalClassesToColors[ResourcePatch.DeclarationProp], OriginalColorToColors[OriginalClassesToColors[ResourcePatch.DeclarationProp]]);
 
                 if ReplaceCount > 0 then
@@ -441,7 +454,17 @@ begin
       end;
 
       if FSettings.RemoveRoundedElementCorners and (FileInfo.AsarFile.Name = 'renderer.js') then
-        FileInfo.Js := FileInfo.Js.Replace('M106.251,0.5C164.653,0.5,212,47.846,212,106.25S164.653,212,106.25,212C47.846,212,0.5,164.654,0.5,106.25 S47.846,0.5,106.251,0.5z', 'M 0 0 V 212 H 212 V 0 H 0', [rfReplaceAll]);
+      begin
+        FileInfo.Js := StringReplace(FileInfo.Js, RoundSvg, 'M 0 0 V 212 H 212 V 0 H 0', [rfReplaceAll], ReplaceCount);
+
+        if ReplaceCount > 0 then
+          FLog.Debug('Replaced %d occurences of "%s"'.Format([ReplaceCount, RoundSvg]))
+        else
+        begin
+          FCssError := True;
+          FLog.Error('"%s" could not be found'.Format([RoundSvg]));
+        end;
+      end;
     end;
 
     // Patch JavaScript
