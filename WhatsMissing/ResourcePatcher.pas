@@ -453,7 +453,7 @@ begin
         end;
       end;
 
-      if FSettings.RemoveRoundedElementCorners and (FileInfo.AsarFile.Name = 'renderer.js') then
+      if FSettings.UseSquaredProfileImages and (FileInfo.AsarFile.Name = 'renderer.js') then
       begin
         FileInfo.Js := StringReplace(FileInfo.Js, RoundSvg, 'M 0 0 V 212 H 212 V 0 H 0', [rfReplaceAll], ReplaceCount);
 
