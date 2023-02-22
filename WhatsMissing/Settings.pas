@@ -429,6 +429,8 @@ begin
     TColorSettingResourcePatch.Create('--outgoing-background-deeper').Darken, TColorSettingResourcePatch.Create('--outgoing-background-deeper-rgb').RGB.Darken,
     TColorSettingResourcePatch.Create('--audio-track-outgoing').Darken3, TColorSettingResourcePatch.Create('--audio-progress-outgoing').Darken10, TColorSettingResourcePatch.Create('--audio-progress-played-outgoing').Darken10]));
 
+  FColorSettings.Add(TColorSettingResource.Create(28, 'Voice mail panel', ImmersiveControlDefaultLightButtonBackgroundRest, [TColorSettingResourcePatch.Create('--ptt-ooc-background')]));
+
   FColorSettings.Add(TColorSettingResource.Create(5, 'Minimize button hover color', ImmersiveControlDefaultLightButtonBackgroundHover,
     [TColorSettingResourcePatch.Create('html[dir] #windows-title-minimize:hover', 'background-color')]));
 
